@@ -52,8 +52,6 @@ from bpy.types import (
         )
 
 
-'''
-
 def main_object(context, obj, level, **kw):
     import random
 
@@ -252,7 +250,6 @@ def main(context, **kw):
 
     print("Done! %d objects in %.4f sec" % (len(objects), time.time() - t))
 
-'''
 class FRACTURE_OT_Cell(Operator):
     bl_idname = "object.add_fracture_cell_objects"
     bl_label = "Cell fracture selected mesh objects"
@@ -475,22 +472,11 @@ class FRACTURE_OT_Cell(Operator):
 
         return {'FINISHED'}
 
-
     def invoke(self, context, event):
         print(self.recursion_chance_select)
         wm = context.window_manager
         return wm.invoke_props_dialog(self, width=600)
 
-# Menu settings
-class FRACTURE_PT_Cell(Panel):
-    bl_idname = 'crackit_panel'
-    bl_label = "Crack it!"
-    bl_space_type = "VIEW_3D"
-    bl_region_type = "UI"
-    #bl_category = "Create"
-    bl_context = 'objectmode'
-    bl_options = {"DEFAULT_CLOSED"}
-    
     def draw(self, context):
         layout = self.layout
         box = layout.box()
@@ -566,11 +552,30 @@ class FRACTURE_PT_Cell(Panel):
         rowsub.prop(self, "use_debug_bool")
 
 
+# Menu settings
+class FRACTURE_PT_Cell(Panel):
+    bl_idname = 'crackit_panel'
+    bl_label = "Fracture Cell"
+    bl_space_type = "VIEW_3D"
+    bl_region_type = "UI"
+    bl_category = "Aho"
+    bl_context = 'objectmode'
+    bl_options = {"DEFAULT_CLOSED"}
+    
+    def draw(self, context):
+        # Show pop-upped menu when the button is hit.
+        layout = self.layout
+        layout.label(text="Cell Fracture:")
+        layout.operator("object.add_fracture_cell_objects",
+                    text="Cell Fracture")
+
+'''
 def menu_func(self, context):
     layout = self.layout
     layout.label(text="Cell Fracture:")
     layout.operator("object.add_fracture_cell_objects",
                     text="Cell Fracture")
+'''
 
 classes = (
     FRACTURE_OT_Cell,
