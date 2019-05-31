@@ -63,7 +63,7 @@ def _points_from_object(obj, source):
         if obj.type == 'MESH':
             mesh = obj.data
             matrix = obj.matrix_world.copy()
-            points.extend([matrix * v.co for v in mesh.vertices])
+            points.extend([matrix @ v.co for v in mesh.vertices])
         else:
             depsgraph = bpy.context.evaluated_depsgraph_get()
             ob_eval = ob.evaluated_get(depsgraph)
@@ -74,7 +74,7 @@ def _points_from_object(obj, source):
 
             if mesh is not None:
                 matrix = obj.matrix_world.copy()
-                points.extend([matrix * v.co for v in mesh.vertices])
+                points.extend([matrix @ v.co for v in mesh.vertices])
                 ob_eval.to_mesh_clear()
 
     def points_from_particles(obj):
@@ -174,7 +174,7 @@ def cell_fracture_objects(context, obj,
         # boundbox approx of overall scale
         from mathutils import Vector
         matrix = obj.matrix_world.copy()
-        bb_world = [matrix * Vector(v) for v in obj.bound_box]
+        bb_world = [matrix @ Vector(v) for v in obj.bound_box]
         scalar = source_noise * ((bb_world[0] - bb_world[6]).length / 2.0)
 
         from mathutils.noise import random_unit_vector
@@ -194,7 +194,7 @@ def cell_fracture_objects(context, obj,
 
     mesh = obj.data
     matrix = obj.matrix_world.copy()
-    verts = [matrix * v.co for v in mesh.vertices]
+    verts = [matrix @ v.co for v in mesh.vertices]
 
     cells = fracture_cell_calc.points_as_bmesh_cells(verts,
                                                      points,
@@ -270,7 +270,8 @@ def cell_fracture_objects(context, obj,
             mesh_src = obj.data
             for mat in mesh_src.materials:
                 mesh_dst.materials.append(mat)
-            for lay_attr in ("vertex_colors", "uv_textures"):
+            #for lay_attr in ("vertex_colors", "uv_textures"):
+            for lay_attr in ("vertex_colors", "uv_layers"):
                 lay_src = getattr(mesh_src, lay_attr)
                 lay_dst = getattr(mesh_dst, lay_attr)
                 for key in lay_src.keys():
