@@ -303,12 +303,13 @@ def cell_fracture_objects(context, obj,
     view_layer.update()
 
     # move this elsewhere...
+    '''
     for obj_cell in objects:
         game = obj_cell.game
         game.physics_type = 'RIGID_BODY'
         game.use_collision_bounds = True
         game.collision_bounds_type = 'CONVEX_HULL'
-
+    '''
     return objects
 
 
@@ -403,7 +404,7 @@ def cell_fracture_boolean(context, obj, objects,
 
         bpy.ops.mesh.separate(type='LOOSE')
 
-        objects_boolean[:] = [obj_cell for obj_cell in scene.objects if obj_cell.select]
+        objects_boolean[:] = [obj_cell for obj_cell in scene.objects if obj_cell.select_get()]
 
     context.view_layer.update()
 
@@ -421,6 +422,7 @@ def cell_fracture_interior_handle(objects,
 
     for obj_cell in objects:
         mesh = obj_cell.data
+        print(mesh)
         bm = bmesh.new()
         bm.from_mesh(mesh)
 
@@ -442,7 +444,7 @@ def cell_fracture_interior_handle(objects,
             obj_cell.vertex_groups.new(name="Interior")
 
         if use_sharp_edges:
-            mesh.show_edge_sharp = True
+            #mesh.show_edge_sharp = True
             for bm_edge in bm.edges:
                 if len({bm_face.hide for bm_face in bm_edge.link_faces}) == 2:
                     bm_edge.smooth = False

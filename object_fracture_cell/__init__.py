@@ -95,7 +95,7 @@ def main_object(context, obj, level, **kw):
                                                         use_debug_redraw=kw_copy["use_debug_redraw"],
                                                         level=level,
                                                         )
-
+    
     # must apply after boolean.
     if use_recenter:
         bpy.ops.object.origin_set({"selected_editable_objects": objects},
@@ -554,7 +554,7 @@ class FRACTURE_OT_Cell(Operator):
 
 # Menu settings
 class FRACTURE_PT_Cell(Panel):
-    bl_idname = 'crackit_panel'
+    bl_idname = 'FRACTURE_PT_Cell'
     bl_label = "Fracture Cell"
     bl_space_type = "VIEW_3D"
     bl_region_type = "UI"
