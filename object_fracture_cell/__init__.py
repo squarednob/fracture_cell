@@ -196,6 +196,8 @@ def main(context, **kw):
     kw_copy = kw.copy()
 
     # mass
+    use_mass = kw_copy.pop("use_mass")
+    mass_name = kw_copy.pop("mass_name")
     mass_mode = kw_copy.pop("mass_mode")
     mass = kw_copy.pop("mass")
 
@@ -207,46 +209,51 @@ def main(context, **kw):
     bpy.ops.object.select_all(action='DESELECT')
     for obj_cell in objects:
         obj_cell.select_set(True)
+    
+    # Blender 2.8:  Mass for BGE was no more available.--
+    # -- Instead, Mass values is used for custom properies on cell objects.
+    if use_mass:
+        if mass_mode == 'UNIFORM':
+            for obj_cell in objects:
+                #obj_cell.game.mass = mass
+                obj_cell[mass_name] = mass
+        elif mass_mode == 'VOLUME':
+            from mathutils import Vector
+            def _get_volume(obj_cell):
+                def _getObjectBBMinMax():
+                    min_co = Vector((1000000.0, 1000000.0, 1000000.0))
+                    max_co = -min_co
+                    matrix = obj_cell.matrix_world
+                    for i in range(0, 8):
+                        bb_vec = obj_cell.matrix_world @ Vector(obj_cell.bound_box[i])
+                        min_co[0] = min(bb_vec[0], min_co[0])
+                        min_co[1] = min(bb_vec[1], min_co[1])
+                        min_co[2] = min(bb_vec[2], min_co[2])
+                        max_co[0] = max(bb_vec[0], max_co[0])
+                        max_co[1] = max(bb_vec[1], max_co[1])
+                        max_co[2] = max(bb_vec[2], max_co[2])
+                    return (min_co, max_co)
 
-    if mass_mode == 'UNIFORM':
-        for obj_cell in objects:
-            obj_cell.game.mass = mass
-    elif mass_mode == 'VOLUME':
-        from mathutils import Vector
-        def _get_volume(obj_cell):
-            def _getObjectBBMinMax():
-                min_co = Vector((1000000.0, 1000000.0, 1000000.0))
-                max_co = -min_co
-                matrix = obj_cell.matrix_world
-                for i in range(0, 8):
-                    bb_vec = obj_cell.matrix_world * Vector(obj_cell.bound_box[i])
-                    min_co[0] = min(bb_vec[0], min_co[0])
-                    min_co[1] = min(bb_vec[1], min_co[1])
-                    min_co[2] = min(bb_vec[2], min_co[2])
-                    max_co[0] = max(bb_vec[0], max_co[0])
-                    max_co[1] = max(bb_vec[1], max_co[1])
-                    max_co[2] = max(bb_vec[2], max_co[2])
-                return (min_co, max_co)
+                def _getObjectVolume():
+                    min_co, max_co = _getObjectBBMinMax()
+                    x = max_co[0] - min_co[0]
+                    y = max_co[1] - min_co[1]
+                    z = max_co[2] - min_co[2]
+                    volume = x * y * z
+                    return volume
 
-            def _getObjectVolume():
-                min_co, max_co = _getObjectBBMinMax()
-                x = max_co[0] - min_co[0]
-                y = max_co[1] - min_co[1]
-                z = max_co[2] - min_co[2]
-                volume = x * y * z
-                return volume
-
-            return _getObjectVolume()
+                return _getObjectVolume()
 
 
-        obj_volume_ls = [_get_volume(obj_cell) for obj_cell in objects]
-        obj_volume_tot = sum(obj_volume_ls)
-        if obj_volume_tot > 0.0:
-            mass_fac = mass / obj_volume_tot
-            for i, obj_cell in enumerate(objects):
-                obj_cell.game.mass = obj_volume_ls[i] * mass_fac
-    else:
-        assert(0)
+            obj_volume_ls = [_get_volume(obj_cell) for obj_cell in objects]
+            obj_volume_tot = sum(obj_volume_ls)
+            if obj_volume_tot > 0.0:
+                mass_fac = mass / obj_volume_tot
+                for i, obj_cell in enumerate(objects):
+                    #obj_cell.game.mass = obj_volume_ls[i] * mass_fac
+                    obj_cell[mass_name] = obj_volume_ls[i] * mass_fac
+        else:
+            assert(0)
 
     print("Done! %d objects in %.4f sec" % (len(objects), time.time() - t))
 
@@ -388,6 +395,18 @@ class FRACTURE_OT_Cell(Operator):
 
     # -------------------------------------------------------------------------
     # Physics Options
+    
+    use_mass: BoolProperty(
+        name="Mass",
+        description="Append mass data on custom properties of cell objects.",
+        default=False,
+        )
+    
+    mass_name: StringProperty(
+        name="Property Name",
+        description="Name for custome properties.",
+        default="mass",
+        )
 
     mass_mode: EnumProperty(
             name="Mass Mode",
@@ -398,7 +417,7 @@ class FRACTURE_OT_Cell(Operator):
             )
 
     mass: FloatProperty(
-            name="Mass",
+            name="Mass Factor",
             description="Mass to give created objects",
             min=0.001, max=1000.0,
             default=1.0,
@@ -456,7 +475,7 @@ class FRACTURE_OT_Cell(Operator):
     use_debug_redraw: BoolProperty(
             name="Show Progress Realtime",
             description="Redraw as fracture is done",
-            default=True,
+            default=False,
             )
 
     use_debug_bool: BoolProperty(
@@ -477,7 +496,7 @@ class FRACTURE_OT_Cell(Operator):
         wm = context.window_manager
         return wm.invoke_props_dialog(self, width=600)
 
-    def draw(self, context):
+    def draw(self, context):       
         layout = self.layout
         box = layout.box()
         col = box.column()
@@ -522,14 +541,6 @@ class FRACTURE_OT_Cell(Operator):
 
         box = layout.box()
         col = box.column()
-        col.label(text="Physics")
-        rowsub = col.row(align=True)
-        rowsub.prop(self, "mass_mode")
-        rowsub.prop(self, "mass")
-
-
-        box = layout.box()
-        col = box.column()
         col.label(text="Object")
         rowsub = col.row(align=True)
         rowsub.prop(self, "use_recenter")
@@ -542,7 +553,21 @@ class FRACTURE_OT_Cell(Operator):
         rowsub.prop(self, "use_layer_index")
         rowsub.prop(self, "use_layer_next")
         rowsub.prop(self, "group_name")
+        
+        
+        box = layout.box()
+        col = box.column()
+        col.label(text="Custom Properties")
+        rowsub = col.row(align=True)
+        rowsub.prop(self, "use_mass")
+        if self.use_mass:
+            rowsub = col.row(align=True)
+            rowsub.prop(self, "mass_name")
+            rowsub = col.row(align=True)
+            rowsub.prop(self, "mass_mode")
+            rowsub.prop(self, "mass")
 
+        
         box = layout.box()
         col = box.column()
         col.label(text="Debug")

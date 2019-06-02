@@ -303,6 +303,8 @@ def cell_fracture_objects(context, obj,
     view_layer.update()
 
     # move this elsewhere...
+    # Blender 2.8: BGE integration was disabled, --
+    # -- because BGE was deleted in Blender 2.8. 
     '''
     for obj_cell in objects:
         game = obj_cell.game
