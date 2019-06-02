@@ -394,18 +394,18 @@ def cell_fracture_boolean(context, obj, objects,
 
             if use_debug_redraw:
                 _redraw_yasiamevil()
-
+    
     if (not use_debug_bool) and use_island_split:
         # this is ugly and Im not proud of this - campbell
         for ob in view_layer.objects:
-            ob.select_set(True)
+            ob.select_set(False)
         for obj_cell in objects_boolean:
             obj_cell.select_set(True)
 
         bpy.ops.mesh.separate(type='LOOSE')
 
         objects_boolean[:] = [obj_cell for obj_cell in scene.objects if obj_cell.select_get()]
-
+     
     context.view_layer.update()
 
     return objects_boolean
@@ -422,7 +422,6 @@ def cell_fracture_interior_handle(objects,
 
     for obj_cell in objects:
         mesh = obj_cell.data
-        print(mesh)
         bm = bmesh.new()
         bm.from_mesh(mesh)
 
