@@ -64,16 +64,16 @@ def main_object(context, obj, level, **kw):
     recursion_clamp = kw_copy.pop("recursion_clamp")
     recursion_chance = kw_copy.pop("recursion_chance")
     recursion_chance_select = kw_copy.pop("recursion_chance_select")
-    use_layer_next = kw_copy.pop("use_layer_next")
-    use_layer_index = kw_copy.pop("use_layer_index")
-    group_name = kw_copy.pop("group_name")
+    #use_collection = kw_copy.pop("use_collection")
+    #new_collection = kw_copy.pop("new_collection")
+    #collection_name = kw_copy.pop("collection_name")
     use_island_split = kw_copy.pop("use_island_split")
     use_debug_bool = kw_copy.pop("use_debug_bool")
     use_interior_vgroup = kw_copy.pop("use_interior_vgroup")
     use_sharp_edges = kw_copy.pop("use_sharp_edges")
     use_sharp_edges_apply = kw_copy.pop("use_sharp_edges_apply")
 
-    collection = context.collection
+    #collection = context.collection
 
     if level != 0:
         kw_copy["source_limit"] = recursion_source_limit
@@ -154,31 +154,8 @@ def main_object(context, obj, level, **kw):
                                                               use_sharp_edges_apply=use_sharp_edges_apply,
                                                               )
 
-    #--------------
-    # Scene Options
 
-    # layer
-    layers_new = None
-    if use_layer_index != 0:
-        layers_new = [False] * 20
-        layers_new[use_layer_index - 1] = True
-    elif use_layer_next:
-        layers_new = [False] * 20
-        layers_new[(obj.layers[:].index(True) + 1) % 20] = True
 
-    if layers_new is not None:
-        for obj_cell in objects:
-            obj_cell.layers = layers_new
-
-    # group
-    if group_name:
-        group = bpy.data.collections.get(group_name)
-        if group is None:
-            group = bpy.data.collections.new(group_name)
-        group_objects = group.objects[:]
-        for obj_cell in objects:
-            if obj_cell not in group_objects:
-                group.objects.link(obj_cell)
 
     if kw_copy["use_debug_redraw"]:
         obj.display_type = obj_display_type_prev
@@ -187,14 +164,18 @@ def main_object(context, obj, level, **kw):
     # obj.hide = True
     return objects
 
-
 def main(context, **kw):
     import time
     t = time.time()
-    objects_context = context.selected_editable_objects
+    objects_context = context.selected_editable_objects    
 
     kw_copy = kw.copy()
-
+    
+    # collection
+    use_collection = kw_copy.pop("use_collection")
+    new_collection = kw_copy.pop("new_collection")
+    collection_name = kw_copy.pop("collection_name")
+    
     # mass
     use_mass = kw_copy.pop("use_mass")
     mass_name = kw_copy.pop("mass_name")
@@ -209,7 +190,7 @@ def main(context, **kw):
     bpy.ops.object.select_all(action='DESELECT')
     for obj_cell in objects:
         obj_cell.select_set(True)
-    
+
     # Blender 2.8:  Mass for BGE was no more available.--
     # -- Instead, Mass values is used for custom properies on cell objects.
     if use_mass:
@@ -255,6 +236,54 @@ def main(context, **kw):
         else:
             assert(0)
 
+    #--------------
+    # Collection Options
+
+    '''
+    # layer
+    layers_new = None
+    if use_layer_index != 0:
+        layers_new = [False] * 20
+        layers_new[use_layer_index - 1] = True
+    elif use_layer_next:
+        layers_new = [False] * 20
+        layers_new[(obj.layers[:].index(True) + 1) % 20] = True
+
+    if layers_new is not None:
+        for obj_cell in objects:
+            obj_cell.layers = layers_new
+     
+    # group
+    if group_name:
+        group = bpy.data.collections.get(group_name)
+        if group is None:
+            group = bpy.data.collections.new(group_name)
+        group_objects = group.objects[:]
+        for obj_cell in objects:
+            if obj_cell not in group_objects:
+                group.objects.link(obj_cell)
+    '''
+    
+    if use_collection:
+        colle = None            
+        if not new_collection:
+            colle = bpy.data.collections.get(collection_name)
+
+        if colle is None:
+            colle = bpy.data.collections.new(collection_name)
+        
+        # THe collection should be children of master collection to show in outliner.
+        child_names = [m.name for m in bpy.context.scene.collection.children]
+        print(child_names)
+        if colle.name not in child_names:
+            bpy.context.scene.collection.children.link(colle)
+            
+        # Cell object is unlinked to master collection to avoid being duplicated children.
+        for colle_obj in objects:
+            colle.objects.link(colle_obj)
+            bpy.context.scene.collection.objects.unlink(colle_obj)
+        
+        
     print("Done! %d objects in %.4f sec" % (len(objects), time.time() - t))
 
 class FRACTURE_OT_Cell(Operator):
@@ -393,6 +422,61 @@ class FRACTURE_OT_Cell(Operator):
             default=False,
             )
 
+
+    # -------------------------------------------------------------------------
+    # Object Options
+
+    use_recenter: BoolProperty(
+            name="Recenter",
+            description="Recalculate the center points after splitting",
+            default=True,
+            )
+
+    use_remove_original: BoolProperty(
+            name="Remove Original",
+            description="Removes the parents used to create the shatter",
+            default=True,
+            )
+
+    # -------------------------------------------------------------------------
+    # Scene Options
+    #
+    # .. different from object options in that this controls how the objects
+    #    are setup in the scene.
+    
+    '''
+    use_layer_index: IntProperty(
+            name="Layer Index",
+            description="Layer to add the objects into or 0 for existing",
+            default=0,
+            min=0, max=20,
+            )
+
+    use_layer_next: BoolProperty(
+            name="Next Layer",
+            description="At the object into the next layer (layer index overrides)",
+            default=True,
+            )
+    '''
+    
+    use_collection: BoolProperty(
+            name="Use Collection",
+            description="Use collection to organize fracture objects",
+            default=True,
+            )
+    
+    new_collection: BoolProperty(
+            name="New Collection",
+            description="Make new collection for fracture objects",
+            default=True,
+            ) 
+    
+    collection_name: StringProperty(
+            name="Name",
+            description="Collection name.",
+            default="Frac Cell",
+            )
+
     # -------------------------------------------------------------------------
     # Physics Options
     
@@ -421,47 +505,6 @@ class FRACTURE_OT_Cell(Operator):
             description="Mass to give created objects",
             min=0.001, max=1000.0,
             default=1.0,
-            )
-
-
-    # -------------------------------------------------------------------------
-    # Object Options
-
-    use_recenter: BoolProperty(
-            name="Recenter",
-            description="Recalculate the center points after splitting",
-            default=True,
-            )
-
-    use_remove_original: BoolProperty(
-            name="Remove Original",
-            description="Removes the parents used to create the shatter",
-            default=True,
-            )
-
-    # -------------------------------------------------------------------------
-    # Scene Options
-    #
-    # .. different from object options in that this controls how the objects
-    #    are setup in the scene.
-
-    use_layer_index: IntProperty(
-            name="Layer Index",
-            description="Layer to add the objects into or 0 for existing",
-            default=0,
-            min=0, max=20,
-            )
-
-    use_layer_next: BoolProperty(
-            name="Next Layer",
-            description="At the object into the next layer (layer index overrides)",
-            default=True,
-            )
-
-    group_name: StringProperty(
-            name="Group",
-            description="Create objects int a group "
-                        "(use existing or create new)",
             )
 
     # -------------------------------------------------------------------------
@@ -548,11 +591,12 @@ class FRACTURE_OT_Cell(Operator):
 
         box = layout.box()
         col = box.column()
-        col.label(text="Scene")
+        col.label(text="Collection")
         rowsub = col.row(align=True)
-        rowsub.prop(self, "use_layer_index")
-        rowsub.prop(self, "use_layer_next")
-        rowsub.prop(self, "group_name")
+        rowsub.prop(self, "use_collection")
+        if self.use_collection:
+            rowsub.prop(self, "new_collection")
+            rowsub.prop(self, "collection_name")
         
         
         box = layout.box()
