@@ -164,6 +164,51 @@ def main_object(context, obj, level, **kw):
     # obj.hide = True
     return objects
 
+def appendMass(objects, mass, mass_mode, mass_name):
+    # Blender 2.8:  Mass for BGE was no more available.--
+    # -- Instead, Mass values is used for custom properies on cell objects.
+    if mass_mode == 'UNIFORM':
+        for obj_cell in objects:
+            #obj_cell.game.mass = mass
+            obj_cell[mass_name] = mass
+    elif mass_mode == 'VOLUME':
+        from mathutils import Vector
+        def _get_volume(obj_cell):
+            def _getObjectBBMinMax():
+                min_co = Vector((1000000.0, 1000000.0, 1000000.0))
+                max_co = -min_co
+                matrix = obj_cell.matrix_world
+                for i in range(0, 8):
+                    bb_vec = obj_cell.matrix_world @ Vector(obj_cell.bound_box[i])
+                    min_co[0] = min(bb_vec[0], min_co[0])
+                    min_co[1] = min(bb_vec[1], min_co[1])
+                    min_co[2] = min(bb_vec[2], min_co[2])
+                    max_co[0] = max(bb_vec[0], max_co[0])
+                    max_co[1] = max(bb_vec[1], max_co[1])
+                    max_co[2] = max(bb_vec[2], max_co[2])
+                return (min_co, max_co)
+
+            def _getObjectVolume():
+                min_co, max_co = _getObjectBBMinMax()
+                x = max_co[0] - min_co[0]
+                y = max_co[1] - min_co[1]
+                z = max_co[2] - min_co[2]
+                volume = x * y * z
+                return volume
+
+            return _getObjectVolume()
+
+
+        obj_volume_ls = [_get_volume(obj_cell) for obj_cell in objects]
+        obj_volume_tot = sum(obj_volume_ls)
+        if obj_volume_tot > 0.0:
+            mass_fac = mass / obj_volume_tot
+            for i, obj_cell in enumerate(objects):
+                #obj_cell.game.mass = obj_volume_ls[i] * mass_fac
+                obj_cell[mass_name] = obj_volume_ls[i] * mass_fac
+    else:
+        assert(0)
+            
 def main(context, **kw):
     import time
     t = time.time()
@@ -191,79 +236,12 @@ def main(context, **kw):
     for obj_cell in objects:
         obj_cell.select_set(True)
 
-    # Blender 2.8:  Mass for BGE was no more available.--
-    # -- Instead, Mass values is used for custom properies on cell objects.
     if use_mass:
-        if mass_mode == 'UNIFORM':
-            for obj_cell in objects:
-                #obj_cell.game.mass = mass
-                obj_cell[mass_name] = mass
-        elif mass_mode == 'VOLUME':
-            from mathutils import Vector
-            def _get_volume(obj_cell):
-                def _getObjectBBMinMax():
-                    min_co = Vector((1000000.0, 1000000.0, 1000000.0))
-                    max_co = -min_co
-                    matrix = obj_cell.matrix_world
-                    for i in range(0, 8):
-                        bb_vec = obj_cell.matrix_world @ Vector(obj_cell.bound_box[i])
-                        min_co[0] = min(bb_vec[0], min_co[0])
-                        min_co[1] = min(bb_vec[1], min_co[1])
-                        min_co[2] = min(bb_vec[2], min_co[2])
-                        max_co[0] = max(bb_vec[0], max_co[0])
-                        max_co[1] = max(bb_vec[1], max_co[1])
-                        max_co[2] = max(bb_vec[2], max_co[2])
-                    return (min_co, max_co)
+        appendMass(objects, mass, mass_mode, mass_name)
 
-                def _getObjectVolume():
-                    min_co, max_co = _getObjectBBMinMax()
-                    x = max_co[0] - min_co[0]
-                    y = max_co[1] - min_co[1]
-                    z = max_co[2] - min_co[2]
-                    volume = x * y * z
-                    return volume
-
-                return _getObjectVolume()
-
-
-            obj_volume_ls = [_get_volume(obj_cell) for obj_cell in objects]
-            obj_volume_tot = sum(obj_volume_ls)
-            if obj_volume_tot > 0.0:
-                mass_fac = mass / obj_volume_tot
-                for i, obj_cell in enumerate(objects):
-                    #obj_cell.game.mass = obj_volume_ls[i] * mass_fac
-                    obj_cell[mass_name] = obj_volume_ls[i] * mass_fac
-        else:
-            assert(0)
 
     #--------------
-    # Collection Options
-
-    '''
-    # layer
-    layers_new = None
-    if use_layer_index != 0:
-        layers_new = [False] * 20
-        layers_new[use_layer_index - 1] = True
-    elif use_layer_next:
-        layers_new = [False] * 20
-        layers_new[(obj.layers[:].index(True) + 1) % 20] = True
-
-    if layers_new is not None:
-        for obj_cell in objects:
-            obj_cell.layers = layers_new
-     
-    # group
-    if group_name:
-        group = bpy.data.collections.get(group_name)
-        if group is None:
-            group = bpy.data.collections.new(group_name)
-        group_objects = group.objects[:]
-        for obj_cell in objects:
-            if obj_cell not in group_objects:
-                group.objects.link(obj_cell)
-    '''
-    
+    # Collection Options   
     if use_collection:
         colle = None            
         if not new_collection:
@@ -274,7 +252,6 @@ def main(context, **kw):
         
         # THe collection should be children of master collection to show in outliner.
         child_names = [m.name for m in bpy.context.scene.collection.children]
-        print(child_names)
         if colle.name not in child_names:
             bpy.context.scene.collection.children.link(colle)
             
@@ -282,8 +259,7 @@ def main(context, **kw):
         for colle_obj in objects:
             colle.objects.link(colle_obj)
             bpy.context.scene.collection.objects.unlink(colle_obj)
-        
-        
+                
     print("Done! %d objects in %.4f sec" % (len(objects), time.time() - t))
 
 class FRACTURE_OT_Cell(Operator):
