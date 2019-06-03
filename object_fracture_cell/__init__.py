@@ -233,10 +233,6 @@ def main(context, **kw):
     for obj_cell in objects:
         obj_cell.select_set(True)
 
-    if use_mass:
-        appendMass(objects, mass, mass_mode, mass_name)
-
-
     #--------------
     # Collection Options   
     if use_collection:
@@ -252,11 +248,14 @@ def main(context, **kw):
         if colle.name not in child_names:
             bpy.context.scene.collection.children.link(colle)
             
-        # Cell object is unlinked to master collection to avoid being duplicated children.
-        for colle_obj in objects:
+        # Cell objects are only link to the collection.
+        bpy.ops.collection.objects_remove_all() # For all selected object.
+        for colle_obj in objects:           
             colle.objects.link(colle_obj)
-            bpy.context.scene.collection.objects.unlink(colle_obj)
-                
+    
+    if use_mass:
+        appendMass(objects, mass, mass_mode, mass_name)            
+    
     print("Done! %d objects in %.4f sec" % (len(objects), time.time() - t))
 
 class FRACTURE_OT_Cell(Operator):
