@@ -129,6 +129,7 @@ def main_object(context, obj, level, **kw):
             objects_recursive = []
             for i, obj_cell in objects_recurse_input:
                 assert(objects[i] is obj_cell)
+                # Repeat main_object() here.
                 objects_recursive += main_object(context, obj_cell, level_sub, **kw)
                 if use_remove_original:
                     collection.objects.unlink(obj_cell)
@@ -158,7 +159,7 @@ def main_object(context, obj, level, **kw):
     # obj.hide = True
     return objects
 
-def appendMass(objects, mass, mass_mode, mass_name):
+def mass_append(objects, mass, mass_mode, mass_name):
     # Blender 2.8:  Mass for BGE was no more available.--
     # -- Instead, Mass values is used for custom properies on cell objects.
     if mass_mode == 'UNIFORM':
@@ -251,7 +252,7 @@ def main(context, **kw):
             colle.objects.link(colle_obj)
     
     if use_mass:
-        appendMass(objects, mass, mass_mode, mass_name)            
+        mass_append(objects, mass, mass_mode, mass_name)            
     
     print("Done! %d objects in %.4f sec" % (len(objects), time.time() - t))
 

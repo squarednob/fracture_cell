@@ -205,9 +205,7 @@ def cell_fracture_objects(context, obj,
     cell_name = obj.name + "_cell"
 
     objects = []
-
     for center_point, cell_points in cells:
-
         # ---------------------------------------------------------------------
         # BMESH
 
@@ -234,6 +232,7 @@ def cell_fracture_objects(context, obj,
         import mathutils
         bmesh.ops.remove_doubles(bm, verts=bm.verts, dist=0.005)
         try:
+            # Making cell meshes as convex full here!
             bmesh.ops.convex_hull(bm, input=bm.verts)
         except RuntimeError:
             import traceback
@@ -460,6 +459,7 @@ def cell_fracture_interior_handle(objects,
             obj_cell.vertex_groups.new(name="Interior")
 
         if use_sharp_edges:
+            bpy.context.space_data.overlay.show_edge_sharp = True
             #mesh.show_edge_sharp = True
             for bm_edge in bm.edges:
                 if len({bm_face.hide for bm_face in bm_edge.link_faces}) == 2:
