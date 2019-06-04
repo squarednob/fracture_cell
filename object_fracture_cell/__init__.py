@@ -70,7 +70,7 @@ def main_object(context, obj, level, **kw):
     use_sharp_edges = kw_copy.pop("use_sharp_edges")
     use_sharp_edges_apply = kw_copy.pop("use_sharp_edges_apply")
 
-    #collection = context.collection
+    collection = context.collection
 
     if level != 0:
         kw_copy["source_limit"] = recursion_source_limit
@@ -92,7 +92,7 @@ def main_object(context, obj, level, **kw):
                                                         use_debug_redraw=kw_copy["use_debug_redraw"],
                                                         level=level,
                                                         )
-    
+
     # must apply after boolean.
     if use_recenter:
         bpy.ops.object.origin_set({"selected_editable_objects": objects},
@@ -150,9 +150,6 @@ def main_object(context, obj, level, **kw):
                                                               use_sharp_edges=use_sharp_edges,
                                                               use_sharp_edges_apply=use_sharp_edges_apply,
                                                               )
-
-
-
 
     if kw_copy["use_debug_redraw"]:
         obj.display_type = obj_display_type_prev
