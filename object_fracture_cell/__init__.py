@@ -98,7 +98,9 @@ def main_object(context, obj, level, **kw):
     if use_recenter:
         bpy.ops.object.origin_set({"selected_editable_objects": objects},
                                   type='ORIGIN_GEOMETRY', center='MEDIAN')
-
+    
+    #--------------
+    # Recursion.
     if level == 0:
         for level_sub in range(1, recursion + 1):
 

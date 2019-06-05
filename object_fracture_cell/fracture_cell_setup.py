@@ -37,12 +37,14 @@ def _points_from_object(obj, source):
         'PENCIL',
         'VERT_OWN', 'VERT_CHILD',
         }
-
+    
+    '''
     print(source - _source_all)
     print(source)
     assert(len(source | _source_all) == len(_source_all))
     assert(len(source))
-
+    '''
+    
     points = []
 
     def edge_center(mesh, edge):
@@ -78,9 +80,12 @@ def _points_from_object(obj, source):
                 ob_eval.to_mesh_clear()
 
     def points_from_particles(obj):
+        depsgraph = bpy.context.evaluated_depsgraph_get()
+        obj_eval = obj.evaluated_get(depsgraph)
+        
         points.extend([p.location.copy()
-                       for psys in obj.particle_systems
-                       for p in psys.particles])
+                       for psys in obj_eval.particle_systems
+                       for p in psys.particles])                
 
     # geom own
     if 'VERT_OWN' in source:
@@ -116,7 +121,7 @@ def _points_from_object(obj, source):
             points.extend([p for spline in get_splines(gp)
                              for p in spline])
 
-    print("Found %d points" % len(points))
+    #print("Found %d points" % len(points))
 
     return points
 
