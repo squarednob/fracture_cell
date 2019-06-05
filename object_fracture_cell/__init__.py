@@ -71,6 +71,7 @@ def main_object(context, obj, level, **kw):
     use_sharp_edges_apply = kw_copy.pop("use_sharp_edges_apply")
 
     collection = context.collection
+    scene = context.scene
 
     if level != 0:
         kw_copy["source_limit"] = recursion_source_limit
