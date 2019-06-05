@@ -345,7 +345,8 @@ class FRACTURE_OT_Cell(Operator):
     # Mesh Data Options
 
     use_smooth_faces: BoolProperty(
-            name="Smooth Faces",
+            name="Smooth Interior",
+            description="Smooth Faces of inner side.",
             default=False,
             )
 
