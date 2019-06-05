@@ -245,7 +245,7 @@ def cell_fracture_objects(context, obj,
             except RuntimeError:
                 import traceback
                 traceback.print_exc()
-
+        # smooth faces will remain only inner faces, after appling boolean modifier.
         if use_smooth_faces:
             for bm_face in bm.faces:
                 bm_face.smooth = True
@@ -328,41 +328,39 @@ def cell_fracture_boolean(context, obj, objects,
     collection = context.collection
     scene = context.scene
     view_layer = context.view_layer
-    depsgraph = context.evaluated_depsgraph_get()
+    #depsgraph = context.evaluated_depsgraph_get()
 
     if use_interior_hide and level == 0:
         # only set for level 0
-        obj.data.polygons.foreach_set("hide", [False] * len(obj.data.polygons))
-
+        obj.data.polygons.foreach_set("hide", [False] * len(obj.data.polygons))  
+    
+    
     for obj_cell in objects:
         mod = obj_cell.modifiers.new(name="Boolean", type='BOOLEAN')
         mod.object = obj
         mod.operation = 'INTERSECT'
 
         if not use_debug_bool:
-
             if use_interior_hide:
                 obj_cell.data.polygons.foreach_set("hide", [True] * len(obj_cell.data.polygons))
             
-
-            # depsgraph is for transforming process like modifier.
-            # make new mesh from original mesh, and update in original mesh data.
-            obj_cell_eval = obj_cell.evaluated_get(depsgraph)
-            mesh_new = bpy.data.meshes.new_from_object(obj_cell_eval)
+            # mesh_old should be made before appling boolean modifier.
             mesh_old = obj_cell.data
-
-            obj_cell.data = mesh_new
-            
+                       
             bpy.context.view_layer.objects.active = obj_cell
             bpy.ops.object.modifier_apply(apply_as='DATA', modifier="Boolean")
-            #obj_cell.modifiers.remove(mod)
-
+            
+            # depsgraph sould be gotten after applign boolean modifier, for new_mesh.
+            depsgraph = context.evaluated_depsgraph_get()
+            obj_cell_eval = obj_cell.evaluated_get(depsgraph)
+            
+            mesh_new = bpy.data.meshes.new_from_object(obj_cell_eval,)            
+            obj_cell.data = mesh_new
             
             '''
-            mesh_new = obj_cell.to_mesh(scene,apply_modifiers=True,settings='PREVIEW')
-            mesh_old = obj_cell.data
-            obj_cell.data = mesh_new
-            obj_cell.modifiers.remove(mod)            
+            check_hide = [11] * len(obj_cell.data.polygons)
+            obj_cell.data.polygons.foreach_get("hide", check_hide)
+            print(check_hide) 
             '''
             
             # remove if not valid
@@ -417,13 +415,13 @@ def cell_fracture_boolean(context, obj, objects,
             ob.select_set(False)
         for obj_cell in objects_boolean:
             obj_cell.select_set(True)
-
+        
+        # If new separated meshes are made, selected objects is increased.
         bpy.ops.mesh.separate(type='LOOSE')
-
         objects_boolean[:] = [obj_cell for obj_cell in scene.objects if obj_cell.select_get()]
      
     context.view_layer.update()
-
+    
     return objects_boolean
 
 
