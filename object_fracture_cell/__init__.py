@@ -274,10 +274,10 @@ class FRACTURE_OT_Cell(Operator):
                                                       "source object")),
                    ('PARTICLE_CHILD', "Child Particles", ("All particle systems of the "
                                                           "child objects")),
-                   ('PENCIL', "Grease Pencil", "This object's grease pencil"),
+                   ('PENCIL', "Annotation Pencil", "Annotation Grease Pencil."),
                    ),
             options={'ENUM_FLAG'},
-            default={'PARTICLE_OWN'},
+            default={'VERT_OWN'},
             )
 
     source_limit: IntProperty(
@@ -517,7 +517,7 @@ class FRACTURE_OT_Cell(Operator):
         layout = self.layout
         box = layout.box()
         col = box.column()
-        col.label(text="Point Source")
+        col.label(text="Fracture From")
         rowsub = col.row()
         rowsub.prop(self, "source")
         rowsub = col.row()

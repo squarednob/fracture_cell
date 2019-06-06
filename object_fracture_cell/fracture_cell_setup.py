@@ -109,18 +109,27 @@ def _points_from_object(obj, source):
         return [point.co.copy() for point in stroke.points]
 
     def get_splines(gp):
-        if gp.layers.active:
-            frame = gp.layers.active.active_frame
-            return [get_points(stroke) for stroke in frame.strokes]
+        gpl = gp.layers.active
+        if gpl:
+            fr = gpl.active_frame
+            if not fr:
+                current = bpy.context.scene.frame_current
+                gpl.frames.new(current)
+                gpl.active_frame = current
+                fr = gpl.active_frame
+            
+            return [get_points(stroke) for stroke in fr.strokes]
+        
         else:
             return []
 
     if 'PENCIL' in source:
-        gp = obj.grease_pencil
+        #gp = obj.grease_pencil
+        gp = bpy.context.scene.grease_pencil
+        
         if gp:
             points.extend([p for spline in get_splines(gp)
                              for p in spline])
-
     #print("Found %d points" % len(points))
 
     return points
