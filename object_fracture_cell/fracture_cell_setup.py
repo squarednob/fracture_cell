@@ -488,3 +488,79 @@ def cell_fracture_interior_handle(objects,
 
         bm.to_mesh(mesh)
         bm.free()
+
+def cell_fracture_post_process(objects,
+                                  use_collection=False,
+                                  new_collection=False,
+                                  collection_name="Fracture",
+                                  use_mass=False,
+                                  mass=1.0,
+                                  mass_mode='VOLUME', mass_name='mass',
+                                  ):
+    """Run after Interiro handle"""
+    #--------------
+    # Collection Options   
+    if use_collection:
+        colle = None            
+        if not new_collection:
+            colle = bpy.data.collections.get(collection_name)
+
+        if colle is None:
+            colle = bpy.data.collections.new(collection_name)
+        
+        # THe collection should be children of master collection to show in outliner.
+        child_names = [m.name for m in bpy.context.scene.collection.children]
+        if colle.name not in child_names:
+            bpy.context.scene.collection.children.link(colle)
+            
+        # Cell objects are only link to the collection.
+        bpy.ops.collection.objects_remove_all() # For all selected object.
+        for colle_obj in objects:           
+            colle.objects.link(colle_obj)
+
+    #--------------
+    # Mass Options     
+    if use_mass:
+        # Blender 2.8:  Mass for BGE was no more available.--
+        # -- Instead, Mass values is used for custom properies on cell objects.
+        if mass_mode == 'UNIFORM':
+            for obj_cell in objects:
+                #obj_cell.game.mass = mass
+                obj_cell[mass_name] = mass
+        elif mass_mode == 'VOLUME':
+            from mathutils import Vector
+            def _get_volume(obj_cell):
+                def _getObjectBBMinMax():
+                    min_co = Vector((1000000.0, 1000000.0, 1000000.0))
+                    max_co = -min_co
+                    matrix = obj_cell.matrix_world
+                    for i in range(0, 8):
+                        bb_vec = obj_cell.matrix_world @ Vector(obj_cell.bound_box[i])
+                        min_co[0] = min(bb_vec[0], min_co[0])
+                        min_co[1] = min(bb_vec[1], min_co[1])
+                        min_co[2] = min(bb_vec[2], min_co[2])
+                        max_co[0] = max(bb_vec[0], max_co[0])
+                        max_co[1] = max(bb_vec[1], max_co[1])
+                        max_co[2] = max(bb_vec[2], max_co[2])
+                    return (min_co, max_co)
+
+                def _getObjectVolume():
+                    min_co, max_co = _getObjectBBMinMax()
+                    x = max_co[0] - min_co[0]
+                    y = max_co[1] - min_co[1]
+                    z = max_co[2] - min_co[2]
+                    volume = x * y * z
+                    return volume
+
+                return _getObjectVolume()
+
+
+            obj_volume_ls = [_get_volume(obj_cell) for obj_cell in objects]
+            obj_volume_tot = sum(obj_volume_ls)
+            if obj_volume_tot > 0.0:
+                mass_fac = mass / obj_volume_tot
+                for i, obj_cell in enumerate(objects):
+                    #obj_cell.game.mass = obj_volume_ls[i] * mass_fac
+                    obj_cell[mass_name] = obj_volume_ls[i] * mass_fac
+        else:
+            assert(0)    

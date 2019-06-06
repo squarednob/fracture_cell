@@ -162,54 +162,12 @@ def main_object(context, obj, level, **kw):
     # obj.hide = True
     return objects
 
-def mass_append(objects, mass, mass_mode, mass_name):
-    # Blender 2.8:  Mass for BGE was no more available.--
-    # -- Instead, Mass values is used for custom properies on cell objects.
-    if mass_mode == 'UNIFORM':
-        for obj_cell in objects:
-            #obj_cell.game.mass = mass
-            obj_cell[mass_name] = mass
-    elif mass_mode == 'VOLUME':
-        from mathutils import Vector
-        def _get_volume(obj_cell):
-            def _getObjectBBMinMax():
-                min_co = Vector((1000000.0, 1000000.0, 1000000.0))
-                max_co = -min_co
-                matrix = obj_cell.matrix_world
-                for i in range(0, 8):
-                    bb_vec = obj_cell.matrix_world @ Vector(obj_cell.bound_box[i])
-                    min_co[0] = min(bb_vec[0], min_co[0])
-                    min_co[1] = min(bb_vec[1], min_co[1])
-                    min_co[2] = min(bb_vec[2], min_co[2])
-                    max_co[0] = max(bb_vec[0], max_co[0])
-                    max_co[1] = max(bb_vec[1], max_co[1])
-                    max_co[2] = max(bb_vec[2], max_co[2])
-                return (min_co, max_co)
-
-            def _getObjectVolume():
-                min_co, max_co = _getObjectBBMinMax()
-                x = max_co[0] - min_co[0]
-                y = max_co[1] - min_co[1]
-                z = max_co[2] - min_co[2]
-                volume = x * y * z
-                return volume
-
-            return _getObjectVolume()
-
-
-        obj_volume_ls = [_get_volume(obj_cell) for obj_cell in objects]
-        obj_volume_tot = sum(obj_volume_ls)
-        if obj_volume_tot > 0.0:
-            mass_fac = mass / obj_volume_tot
-            for i, obj_cell in enumerate(objects):
-                #obj_cell.game.mass = obj_volume_ls[i] * mass_fac
-                obj_cell[mass_name] = obj_volume_ls[i] * mass_fac
-    else:
-        assert(0)
             
 def main(context, **kw):
+    '''
     import time
     t = time.time()
+    '''
     objects_context = context.selected_editable_objects    
 
     kw_copy = kw.copy()
@@ -234,30 +192,18 @@ def main(context, **kw):
     for obj_cell in objects:
         obj_cell.select_set(True)
 
-    #--------------
-    # Collection Options   
-    if use_collection:
-        colle = None            
-        if not new_collection:
-            colle = bpy.data.collections.get(collection_name)
-
-        if colle is None:
-            colle = bpy.data.collections.new(collection_name)
-        
-        # THe collection should be children of master collection to show in outliner.
-        child_names = [m.name for m in bpy.context.scene.collection.children]
-        if colle.name not in child_names:
-            bpy.context.scene.collection.children.link(colle)
-            
-        # Cell objects are only link to the collection.
-        bpy.ops.collection.objects_remove_all() # For all selected object.
-        for colle_obj in objects:           
-            colle.objects.link(colle_obj)
+    fracture_cell_setup.cell_fracture_post_process(objects,
+                                  use_collection=use_collection,
+                                  new_collection=new_collection,
+                                  collection_name=collection_name,
+                                  use_mass=use_mass,
+                                  mass=mass,
+                                  mass_mode=mass_mode,
+                                  mass_name=mass_name,
+                                  )          
     
-    if use_mass:
-        mass_append(objects, mass, mass_mode, mass_name)            
-    
-    print("Done! %d objects in %.4f sec" % (len(objects), time.time() - t))
+    #print("Done! %d objects in %.4f sec" % (len(objects), time.time() - t))
+    print("Done!")
 
 class FRACTURE_OT_Cell(Operator):
     bl_idname = "object.add_fracture_cell_objects"
@@ -448,7 +394,7 @@ class FRACTURE_OT_Cell(Operator):
     collection_name: StringProperty(
             name="Name",
             description="Collection name.",
-            default="Frac Cell",
+            default="Fracture",
             )
 
     # -------------------------------------------------------------------------
@@ -503,13 +449,11 @@ class FRACTURE_OT_Cell(Operator):
 
     def execute(self, context):
         keywords = self.as_keywords()  # ignore=("blah",)
-
         main(context, **keywords)
-
         return {'FINISHED'}
 
     def invoke(self, context, event):
-        print(self.recursion_chance_select)
+        #print(self.recursion_chance_select)
         wm = context.window_manager
         return wm.invoke_props_dialog(self, width=600)
 
