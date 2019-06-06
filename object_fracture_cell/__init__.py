@@ -545,7 +545,7 @@ class FRACTURE_PT_Cell(Panel):
     bl_label = "Fracture Cell"
     bl_space_type = "VIEW_3D"
     bl_region_type = "UI"
-    bl_category = "Aho"
+    bl_category = "Transform"
     bl_context = 'objectmode'
     bl_options = {"DEFAULT_CLOSED"}
     
