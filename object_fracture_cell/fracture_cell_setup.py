@@ -29,16 +29,29 @@ def _redraw_yasiamevil():
 _redraw_yasiamevil.opr = bpy.ops.wm.redraw_timer
 _redraw_yasiamevil.arg = dict(type='DRAW_WIN_SWAP', iterations=1)
 
+def _limit_source(points, source_limit):
+    if source_limit != 0 and source_limit < len(points):
+        import random
+        random.shuffle(points)
+        points[source_limit:] = []
+        return points
+    else:
+        return points
 
-def _points_from_object(obj, source):
-
+def _points_from_object(obj,
+                        source_vert_own,
+                        source_vert_child,
+                        source_particle_own,
+                        source_particle_child,
+                        source_pencil):
+    
+    '''
     _source_all = {
         'PARTICLE_OWN', 'PARTICLE_CHILD',
         'PENCIL',
         'VERT_OWN', 'VERT_CHILD',
         }
     
-    '''
     print(source - _source_all)
     print(source)
     assert(len(source | _source_all) == len(_source_all))
@@ -46,7 +59,7 @@ def _points_from_object(obj, source):
     '''
     
     points = []
-
+    
     def edge_center(mesh, edge):
         v1, v2 = edge.vertices
         return (mesh.vertices[v1].co + mesh.vertices[v2].co) / 2.0
@@ -65,7 +78,9 @@ def _points_from_object(obj, source):
         if obj.type == 'MESH':
             mesh = obj.data
             matrix = obj.matrix_world.copy()
-            points.extend([matrix @ v.co for v in mesh.vertices])
+            #points.extend([matrix @ v.co for v in mesh.vertices])]
+            p = [(matrix @ v.co, 'VERTS') for v in mesh.vertices]
+            return p
         else:
             depsgraph = bpy.context.evaluated_depsgraph_get()
             ob_eval = ob.evaluated_get(depsgraph)
@@ -76,33 +91,47 @@ def _points_from_object(obj, source):
 
             if mesh is not None:
                 matrix = obj.matrix_world.copy()
-                points.extend([matrix @ v.co for v in mesh.vertices])
+                #points.extend([matrix @ v.co for v in mesh.vertices])
+                p =  [(matrix @ v.co, 'VERTS') for v in mesh.vertices]
                 ob_eval.to_mesh_clear()
+                return p
 
     def points_from_particles(obj):
         depsgraph = bpy.context.evaluated_depsgraph_get()
         obj_eval = obj.evaluated_get(depsgraph)
         
-        points.extend([p.location.copy()
-                       for psys in obj_eval.particle_systems
-                       for p in psys.particles])                
+        #points.extend([p.location.copy()
+        #               for psys in obj_eval.particle_systems
+        #               for p in psys.particles])                
+        p = [(particle.location.copy(), 'PARTICLE')
+               for psys in obj_eval.particle_systems
+               for particle in psys.particles]
+        return p
 
     # geom own
-    if 'VERT_OWN' in source:
-        points_from_verts(obj)
+    if source_vert_own > 0:
+        new_points = points_from_verts(obj)
+        new_points = _limit_source(new_points, source_vert_own)
+        points.extend(new_points)
 
     # geom children
-    if 'VERT_CHILD' in source:
+    if source_vert_child > 0:
         for obj_child in obj.children:
-            points_from_verts(obj_child)
-
+            new_points  = points_from_verts(obj_child)
+            new_points = _limit_source(new_points, source_vert_child)
+            points.extend(new_points)
+    
     # geom particles
-    if 'PARTICLE_OWN' in source:
-        points_from_particles(obj)
+    if source_particle_own > 0:
+        new_points = points_from_particles(obj)
+        new_points = _limit_source(new_points, source_particle_own)
+        points.extend(new_points)
 
-    if 'PARTICLE_CHILD' in source:
+    if source_particle_child > 0:
         for obj_child in obj.children:
-            points_from_particles(obj_child)
+            new_points = points_from_particles(obj_child)
+            new_points = _limit_source(new_points, source_particle_child)
+            points.extend(new_points)
 
     # grease pencil
     def get_points(stroke):
@@ -123,20 +152,26 @@ def _points_from_object(obj, source):
         else:
             return []
 
-    if 'PENCIL' in source:
-        #gp = obj.grease_pencil
+    if source_pencil > 0:   
         gp = bpy.context.scene.grease_pencil
         
         if gp:
-            points.extend([p for spline in get_splines(gp)
-                             for p in spline])
+            new_points = [(p, 'PENCIL') for spline in get_splines(gp)
+                             for p in spline]
+            new_points = _limit_source(new_points, source_pencil)
+            points.extend(new_points)
+    
     #print("Found %d points" % len(points))
-
     return points
 
 
 def cell_fracture_objects(context, obj,
-                          source={'PARTICLE_OWN'},
+                          # Source From
+                          source_vert_own=100,
+                          source_vert_child=0,
+                          source_particle_own=0,
+                          source_particle_child=0,
+                          source_pencil=0,
                           source_limit=0,
                           source_noise=0.0,
                           clean=True,
@@ -156,32 +191,40 @@ def cell_fracture_objects(context, obj,
 
     # -------------------------------------------------------------------------
     # GET POINTS
-
-    points = _points_from_object(obj, source)
+    points = _points_from_object(obj,
+                                source_vert_own,
+                                source_vert_child,
+                                source_particle_own,
+                                source_particle_child,
+                                source_pencil,
+                                )
 
     if not points:
         # print using fallback
-        points = _points_from_object(obj, {'VERT_OWN'})
+        #points = _points_from_object(obj, {'VERT_OWN'})
+        _points_from_object(obj, source_vert_own, 0,0,0,0)
 
     if not points:
         print("no points found")
         return []
-
+    
+    '''
     # apply optional clamp
     if source_limit != 0 and source_limit < len(points):
         import random
         random.shuffle(points)
         points[source_limit:] = []
-
+    '''
+    
     # saddly we cant be sure there are no doubles
     from mathutils import Vector
     to_tuple = Vector.to_tuple
-    points = list({to_tuple(p, 4): p for p in points}.values())
+    # To remove doubles, round the values.
+    
+    #points = list({to_tuple(p, 4): p for p in points}.values())
+    points = [(Vector(to_tuple(p[0], 4)),p[1]) for p in points]
     del to_tuple
     del Vector
-
-    # end remove doubles
-    # ------------------
 
     if source_noise > 0.0:
         from random import random
@@ -193,12 +236,12 @@ def cell_fracture_objects(context, obj,
 
         from mathutils.noise import random_unit_vector
 
-        points[:] = [p + (random_unit_vector() * (scalar * random())) for p in points]
+        points[:] = [(p[0] + (random_unit_vector() * (scalar * random())), p[1]) for p in points]
 
     if use_debug_points:
         bm = bmesh.new()
         for p in points:
-            bm.verts.new(p)
+            bm.verts.new(p[0])
         mesh_tmp = bpy.data.meshes.new(name="DebugPoints")
         bm.to_mesh(mesh_tmp)
         bm.free()
@@ -225,7 +268,8 @@ def cell_fracture_objects(context, obj,
 
         # create the convex hulls
         bm = bmesh.new()
-
+        
+        #この段階でセルの各点にランダム性を加えるより、前の点計算の段階でやったほうがいいのでは？　bm.verts.new(co)以外は。
         # WORKAROUND FOR CONVEX HULL BUG/LIMIT
         # XXX small noise
         import random
@@ -244,6 +288,7 @@ def cell_fracture_objects(context, obj,
             bm_vert = bm.verts.new(co)
 
         import mathutils
+        #　この重複削除の距離は、調節したいな。ただし、これより前の計算段階でできそうだが。
         bmesh.ops.remove_doubles(bm, verts=bm.verts, dist=0.005)
         try:
             # Making cell meshes as convex full here!
@@ -353,6 +398,8 @@ def cell_fracture_boolean(context, obj, objects,
         mod = obj_cell.modifiers.new(name="Boolean", type='BOOLEAN')
         mod.object = obj
         mod.operation = 'INTERSECT'
+        
+        
 
         if not use_debug_bool:
             if use_interior_hide:
@@ -363,6 +410,7 @@ def cell_fracture_boolean(context, obj, objects,
                        
             bpy.context.view_layer.objects.active = obj_cell
             bpy.ops.object.modifier_apply(apply_as='DATA', modifier="Boolean")
+            
             
             # depsgraph sould be gotten after applign boolean modifier, for new_mesh.
             depsgraph = context.evaluated_depsgraph_get()

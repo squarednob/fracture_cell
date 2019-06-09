@@ -32,7 +32,7 @@ def points_as_bmesh_cells(verts,
 
     cells = []
 
-    points_sorted_current = [p for p in points]
+    points_sorted_current = [(Vector(p[0]), p[1]) for p in points]
     plane_indices = []
     vertices = []
 
@@ -51,6 +51,8 @@ def points_as_bmesh_cells(verts,
         xmin, xmax = min(xa) - margin_bounds, max(xa) + margin_bounds
         ymin, ymax = min(ya) - margin_bounds, max(ya) + margin_bounds
         zmin, zmax = min(za) - margin_bounds, max(za) + margin_bounds
+        # (x,y,z,scaler) for plane. xyz is normaliized direction. scaler is scale for plane.
+        # Plane will be made at the perpendicular direction of the normal vector.
         convexPlanes = [
             Vector((+1.0, 0.0, 0.0, -xmax)),
             Vector((-1.0, 0.0, 0.0, +xmin)),
@@ -60,18 +62,33 @@ def points_as_bmesh_cells(verts,
             Vector((0.0, 0.0, -1.0, +zmin)),
             ]
 
-    for i, point_cell_current in enumerate(points):
+    for i, point in enumerate(points):
+        point_cell_current = point[0]
+
         planes = [None] * len(convexPlanes)
         for j in range(len(convexPlanes)):
             planes[j] = convexPlanes[j].copy()
+            # e.g. Dot product point's (xyz) with convex's (+1.0,0.0,0.0) detects x value of the point.
+            # e.g. Then, x scaler += point's x value.
             planes[j][3] += planes[j].xyz.dot(point_cell_current)
         distance_max = 10000000000.0  # a big value!
-
-        points_sorted_current.sort(key=lambda p: (p - point_cell_current).length_squared)
-
+        
+        # Closer points to the current point are earlier order. Of course, current point is the first.
+        points_sorted_current.sort(key=lambda p: (p[0] - point_cell_current).length_squared)
+        
+        # Compare the current point with other points.
         for j in range(1, len(points)):
-            normal = points_sorted_current[j] - point_cell_current
-            nlength = normal.length
+            normal = 0
+            
+            '''
+            if points_sorted_current[j][1] == 'PENCIL' and point[1] == "PENCIL":
+                normal = (point_cell_current*0.999) - point_cell_current
+            else:
+                normal = points_sorted_current[j][0] - point_cell_current
+            '''
+            normal = points_sorted_current[j][0] - point_cell_current
+            
+            nlength = normal.length # is sqrt(X^2+y^2+z^2).
 
             if points_scale is not None:
                 normal_alt = normal.copy()
@@ -79,8 +96,9 @@ def points_as_bmesh_cells(verts,
                 normal_alt.y *= points_scale[1]
                 normal_alt.z *= points_scale[2]
 
-                # rotate plane to new distance
-                # should always be positive!! - but abs incase
+                # -rotate plane to new distance
+                # -should always be positive!! - but abs incase
+                # Scale rate (normal_alt/normal). If these are the same, dot product is 1.
                 scalar = normal_alt.normalized().dot(normal.normalized())
                 # assert(scalar >= 0.0)
                 nlength *= scalar
@@ -89,11 +107,13 @@ def points_as_bmesh_cells(verts,
             if nlength > distance_max:
                 break
 
+            # 4D vector, the same form as convexPlanes. (x,y,z,scaler).
             plane = normal.normalized()
             plane.resize_4d()
             plane[3] = (-nlength / 2.0) + margin_cell
             planes.append(plane)
-
+            
+            # Make vertex points of cell, by crossing point of planes.
             vertices[:], plane_indices[:] = mathutils.geometry.points_in_planes(planes)
             if len(vertices) == 0:
                 break
@@ -108,7 +128,7 @@ def points_as_bmesh_cells(verts,
                 distance = v.length_squared
                 if distance_max < distance:
                     distance_max = distance
-            distance_max = sqrt(distance_max)  # make real length
+            distance_max = sqrt(distance_max)  # make real length　ここでルートでマックスを下げているのか？でも下で２倍にしているが。
             distance_max *= 2.0
 
         if len(vertices) == 0:

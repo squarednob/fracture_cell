@@ -44,6 +44,7 @@ from bpy.props import (
         FloatProperty,
         FloatVectorProperty,
         EnumProperty,
+        BoolVectorProperty,
         )
 
 from bpy.types import (
@@ -212,6 +213,8 @@ class FRACTURE_OT_Cell(Operator):
 
     # -------------------------------------------------------------------------
     # Source Options
+
+    '''
     source: EnumProperty(
             name="Source",
             items=(('VERT_OWN', "Own Verts", "Use own vertices"),
@@ -220,12 +223,43 @@ class FRACTURE_OT_Cell(Operator):
                                                       "source object")),
                    ('PARTICLE_CHILD', "Child Particles", ("All particle systems of the "
                                                           "child objects")),
-                   ('PENCIL', "Annotation Pencil", "Annotation Grease Pencil."),
+                   ('PENCIL', "Annotation Pencil", "Annotation Grease Pencil"),
                    ),
             options={'ENUM_FLAG'},
             default={'VERT_OWN'},
+            ) 
+    '''
+    source_vert_own: IntProperty(
+            name="Own Verts",
+            description="Use own vertices",
+            min=0, max=5000,
+            default=100,
             )
-
+    source_vert_child: IntProperty(
+            name="Child Verts",
+            description="Use child object vertices",
+            min=0, max=5000,
+            default=0,
+            )
+    source_particle_own: IntProperty(
+            name="Own Particles",
+            description="All particle systems of the source object",
+            min=0, max=5000,
+            default=0,
+            )
+    source_particle_child: IntProperty(
+            name="Child Particles",
+            description="All particle systems of the child objects",
+            min=0, max=5000,
+            default=0,
+            )
+    source_pencil: IntProperty(
+            name="Annotation Pencil",
+            description="Annotation Grease Pencil",
+            min=0, max=100,
+            default=0,
+            )
+            
     source_limit: IntProperty(
             name="Source Limit",
             description="Limit the number of input points, 0 for unlimited",
@@ -463,7 +497,12 @@ class FRACTURE_OT_Cell(Operator):
         col = box.column()
         col.label(text="Fracture From")
         rowsub = col.row()
-        rowsub.prop(self, "source")
+        #rowsub.prop(self, "source")
+        rowsub.prop(self, "source_vert_own")
+        rowsub.prop(self, "source_vert_child")
+        rowsub.prop(self, "source_particle_own")
+        rowsub.prop(self, "source_particle_child")
+        rowsub.prop(self, "source_pencil")
         rowsub = col.row()
         rowsub.prop(self, "source_limit")
         rowsub.prop(self, "source_noise")
