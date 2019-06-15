@@ -59,7 +59,7 @@ def main_object(context, obj, level, **kw):
     # pull out some args
     kw_copy = kw.copy()
     use_recenter = kw_copy.pop("use_recenter")
-    use_remove_original = kw_copy.pop("use_remove_original")
+    #use_remove_original = kw_copy.pop("use_remove_original")
     recursion = kw_copy.pop("recursion")
     recursion_source_limit = kw_copy.pop("recursion_source_limit")
     recursion_clamp = kw_copy.pop("recursion_clamp")
