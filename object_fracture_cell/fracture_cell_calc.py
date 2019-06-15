@@ -32,7 +32,7 @@ def points_as_bmesh_cells(verts,
 
     cells = []
 
-    points_sorted_current = [(Vector(p[0]), p[1]) for p in points]
+    #points_sorted_current = [(Vector(p[0]), p[1]) for p in points]
     plane_indices = []
     vertices = []
 
@@ -62,32 +62,36 @@ def points_as_bmesh_cells(verts,
             Vector((0.0, 0.0, -1.0, +zmin)),
             ]
 
-    for i, point in enumerate(points):
-        point_cell_current = point[0]
-
+ 
+    points_dist_sorted = [(Vector(p[0]), p[1]) for p in points]
+    
+    for i, point_current in enumerate(points):
+    
         planes = [None] * len(convexPlanes)
         for j in range(len(convexPlanes)):
-            planes[j] = convexPlanes[j].copy()
+            planes[j] = convexPlanes[j].copy()               
             # e.g. Dot product point's (xyz) with convex's (+1.0,0.0,0.0) detects x value of the point.
             # e.g. Then, x scaler += point's x value.
-            planes[j][3] += planes[j].xyz.dot(point_cell_current)
+            planes[j][3] += planes[j].xyz.dot(point_current[0])
+            
+        
         distance_max = 10000000000.0  # a big value!
         
         # Closer points to the current point are earlier order. Of course, current point is the first.
-        points_sorted_current.sort(key=lambda p: (p[0] - point_cell_current).length_squared)
+        points_dist_sorted.sort(key=lambda p: (p[0] - point_current[0]).length_squared)
+
         
         # Compare the current point with other points.
-        for j in range(1, len(points)):
-            normal = 0
-            
+        for j in range(1, len(points)):        
+            normal = 0           
             '''
             if points_sorted_current[j][1] == 'PENCIL' and point[1] == "PENCIL":
                 normal = (point_cell_current*0.999) - point_cell_current
             else:
                 normal = points_sorted_current[j][0] - point_cell_current
             '''
-            normal = points_sorted_current[j][0] - point_cell_current
             
+            normal = points_dist_sorted[j][0] - point_current[0]           
             nlength = normal.length # is sqrt(X^2+y^2+z^2).
 
             if points_scale is not None:
@@ -122,7 +126,7 @@ def points_as_bmesh_cells(verts,
                 planes[:] = [planes[k] for k in plane_indices]
 
             # for comparisons use length_squared and delay
-            # converting to a real length until the end.
+            # converting to a real length until the end. 
             distance_max = 10000000000.0  # a big value!
             for v in vertices:
                 distance = v.length_squared
@@ -131,9 +135,12 @@ def points_as_bmesh_cells(verts,
             distance_max = sqrt(distance_max)  # make real length　ここでルートでマックスを下げているのか？でも下で２倍にしているが。
             distance_max *= 2.0
 
+
         if len(vertices) == 0:
             continue
-
-        cells.append((point_cell_current, vertices[:]))
-        del vertices[:]
+            
+        cells.append((point_current[0], vertices[:]))
+        del vertices[:]        
+        
+    
     return cells

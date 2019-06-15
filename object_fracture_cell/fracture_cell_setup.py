@@ -83,7 +83,7 @@ def _points_from_object(obj,
             return p
         else:
             depsgraph = bpy.context.evaluated_depsgraph_get()
-            ob_eval = ob.evaluated_get(depsgraph)
+            ob_eval = obj.evaluated_get(depsgraph)
             try:
                 mesh = ob_eval.to_mesh()
             except:
@@ -156,10 +156,25 @@ def _points_from_object(obj,
         gp = bpy.context.scene.grease_pencil
         
         if gp:
-            new_points = [(p, 'PENCIL') for spline in get_splines(gp)
+            line_points = [(p, 'PENCIL') for spline in get_splines(gp)
                              for p in spline]
-            new_points = _limit_source(new_points, source_pencil)
-            points.extend(new_points)
+            line_points = _limit_source(line_points, source_pencil)
+
+        # Make New point between the line point and the closest point.
+        if not points:
+            points.extend(line_points)
+            
+        else:
+            for lp in line_points:
+                # Make vector between the line point and its closest point.
+                points.sort(key=lambda p: (p[0] - lp[0]).length_squared)
+                closest_point = points[0]           
+                normal = lp[0].xyz - closest_point[0].xyz
+                           
+                new_point = (lp[0], lp[1])
+                new_point[0].xyz +=  normal / 2
+               
+                points.append(new_point)
     
     #print("Found %d points" % len(points))
     return points
