@@ -213,15 +213,20 @@ def cell_fracture_objects(context, obj,
                                 source_particle_child,
                                 source_pencil,
                                 )
-
+    
+    '''
     if not points:
         # print using fallback
         #points = _points_from_object(obj, {'VERT_OWN'})
         _points_from_object(obj, source_vert_own, 0,0,0,0)
+    '''
 
     if not points:
-        print("no points found")
-        return []
+        assert points, "No points found"
+        #print("no points found")
+        #return []
+        #return 
+
     
     '''
     # apply optional clamp
@@ -230,12 +235,13 @@ def cell_fracture_objects(context, obj,
         random.shuffle(points)
         points[source_limit:] = []
     '''
+
     
     # saddly we cant be sure there are no doubles
     from mathutils import Vector
     to_tuple = Vector.to_tuple
-    # To remove doubles, round the values.
     
+    # To remove doubles, round the values.    
     #points = list({to_tuple(p, 4): p for p in points}.values())
     points = [(Vector(to_tuple(p[0], 4)),p[1]) for p in points]
     del to_tuple

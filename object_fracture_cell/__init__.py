@@ -188,6 +188,8 @@ def main(context, **kw):
     for obj in objects_context:
         if obj.type == 'MESH':
             objects += main_object(context, obj, 0, **kw_copy)
+        else:
+            assert obj.type == 'MESH', "No MESH object selected."
 
     bpy.ops.object.select_all(action='DESELECT')
     for obj_cell in objects:
