@@ -261,6 +261,12 @@ class FRACTURE_OT_Cell(Operator):
             min=0, max=100,
             default=0,
             )
+    source_random: IntProperty(
+            name="Random",
+            description="Random seed position",
+            min=0, max=2000,
+            default=0,
+            )
             
     source_limit: IntProperty(
             name="Source Limit",
@@ -505,6 +511,7 @@ class FRACTURE_OT_Cell(Operator):
         rowsub.prop(self, "source_particle_own")
         rowsub.prop(self, "source_particle_child")
         rowsub.prop(self, "source_pencil")
+        rowsub.prop(self, "source_random")
         rowsub = col.row()
         rowsub.prop(self, "source_limit")
         rowsub.prop(self, "source_noise")

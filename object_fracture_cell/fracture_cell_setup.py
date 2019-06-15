@@ -38,12 +38,13 @@ def _limit_source(points, source_limit):
     else:
         return points
 
-def _points_from_object(obj,
+def _points_from_object(obj, verts,
                         source_vert_own,
                         source_vert_child,
                         source_particle_own,
                         source_particle_child,
-                        source_pencil):
+                        source_pencil,
+                        source_random):
     
     '''
     _source_all = {
@@ -77,9 +78,9 @@ def _points_from_object(obj,
         """Takes points from _any_ object with geometry"""
         if obj.type == 'MESH':
             mesh = obj.data
-            matrix = obj.matrix_world.copy()
-            #points.extend([matrix @ v.co for v in mesh.vertices])]
+            matrix = obj.matrix_world.copy()    
             p = [(matrix @ v.co, 'VERTS') for v in mesh.vertices]
+            
             return p
         else:
             depsgraph = bpy.context.evaluated_depsgraph_get()
@@ -89,10 +90,10 @@ def _points_from_object(obj,
             except:
                 mesh = None
 
-            if mesh is not None:
+            if mesh is not None:               
                 matrix = obj.matrix_world.copy()
-                #points.extend([matrix @ v.co for v in mesh.vertices])
                 p =  [(matrix @ v.co, 'VERTS') for v in mesh.vertices]
+                
                 ob_eval.to_mesh_clear()
                 return p
 
@@ -107,17 +108,41 @@ def _points_from_object(obj,
                for psys in obj_eval.particle_systems
                for particle in psys.particles]
         return p
+    
+    def points_from_random(obj, verts):
+        xa = [v[0] for v in verts]
+        ya = [v[1] for v in verts]
+        za = [v[2] for v in verts]
+        xmin, xmax = min(xa), max(xa)
+        ymin, ymax = min(ya), max(ya)
+        zmin, zmax = min(za), max(za)
 
-    # geom own
+        from random import uniform
+        from mathutils import Vector
+        
+        p = []
+        for i in range(source_random):
+            new_pos = Vector( (uniform(xmin, xmax), uniform(ymin, ymax), uniform(zmin, zmax)) )
+            p.append((new_pos, 'RANDOM'))
+  
+        return p  
+    
+     # geom own
     if source_vert_own > 0:
         new_points = points_from_verts(obj)
         new_points = _limit_source(new_points, source_vert_own)
         points.extend(new_points)
+    
+    # geom random
+    if source_random > 0:
+        new_points = points_from_random(obj, verts)
+        points.extend(new_points)
+
 
     # geom children
     if source_vert_child > 0:
         for obj_child in obj.children:
-            new_points  = points_from_verts(obj_child)
+            new_points  = points_from_verts(obj_child, verts)
             new_points = _limit_source(new_points, source_vert_child)
             points.extend(new_points)
     
@@ -187,6 +212,7 @@ def cell_fracture_objects(context, obj,
                           source_particle_own=0,
                           source_particle_child=0,
                           source_pencil=0,
+                          source_random=0,
                           source_limit=0,
                           source_noise=0.0,
                           clean=True,
@@ -203,15 +229,20 @@ def cell_fracture_objects(context, obj,
     from . import fracture_cell_calc
     collection = context.collection
     view_layer = context.view_layer
-
+    
+    mesh = obj.data
+    matrix = obj.matrix_world.copy()
+    verts = [matrix @ v.co for v in mesh.vertices]
+    
     # -------------------------------------------------------------------------
     # GET POINTS
-    points = _points_from_object(obj,
+    points = _points_from_object(obj, verts,
                                 source_vert_own,
                                 source_vert_child,
                                 source_particle_own,
                                 source_particle_child,
                                 source_pencil,
+                                source_random
                                 )
     
     '''
@@ -270,9 +301,11 @@ def cell_fracture_objects(context, obj,
         collection.objects.link(obj_tmp)
         del obj_tmp, mesh_tmp
 
+    '''
     mesh = obj.data
     matrix = obj.matrix_world.copy()
     verts = [matrix @ v.co for v in mesh.vertices]
+    '''
 
     cells = fracture_cell_calc.points_as_bmesh_cells(verts,
                                                      points,
