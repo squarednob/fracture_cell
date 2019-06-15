@@ -215,22 +215,6 @@ class FRACTURE_OT_Cell(Operator):
 
     # -------------------------------------------------------------------------
     # Source Options
-
-    '''
-    source: EnumProperty(
-            name="Source",
-            items=(('VERT_OWN', "Own Verts", "Use own vertices"),
-                   ('VERT_CHILD', "Child Verts", "Use child object vertices"),
-                   ('PARTICLE_OWN', "Own Particles", ("All particle systems of the "
-                                                      "source object")),
-                   ('PARTICLE_CHILD', "Child Particles", ("All particle systems of the "
-                                                          "child objects")),
-                   ('PENCIL', "Annotation Pencil", "Annotation Grease Pencil"),
-                   ),
-            options={'ENUM_FLAG'},
-            default={'VERT_OWN'},
-            ) 
-    '''
     source_vert_own: IntProperty(
             name="Own Verts",
             description="Use own vertices",
@@ -267,21 +251,29 @@ class FRACTURE_OT_Cell(Operator):
             min=0, max=2000,
             default=0,
             )
-            
+    '''        
     source_limit: IntProperty(
             name="Source Limit",
             description="Limit the number of input points, 0 for unlimited",
             min=0, max=5000,
             default=100,
             )
-
+    '''
+    
+    # -------------------------------------------------------------------------
+    # Transform 
     source_noise: FloatProperty(
             name="Noise",
             description="Randomize point distribution",
             min=0.0, max=1.0,
             default=0.0,
             )
-
+    margin: FloatProperty(
+            name="Margin",
+            description="Gaps for the fracture (gives more stable physics)",
+            min=0.0, max=1.0,
+            default=0.001,
+            )
     cell_scale: FloatVectorProperty(
             name="Scale",
             description="Scale Cell Shape",
@@ -289,38 +281,43 @@ class FRACTURE_OT_Cell(Operator):
             min=0.0, max=1.0,
             default=(1.0, 1.0, 1.0),
             )
+    use_recenter: BoolProperty(
+            name="Recenter",
+            description="Recalculate the center points after splitting",
+            default=True,
+            )
+    use_island_split: BoolProperty(
+            name="Split Islands",
+            description="Split disconnected meshes",
+            default=True,
+            )
 
     # -------------------------------------------------------------------------
     # Recursion
-
     recursion: IntProperty(
             name="Recursion",
             description="Break shards recursively",
-            min=0, max=5000,
+            min=0, max=2000,
             default=0,
             )
-
     recursion_source_limit: IntProperty(
             name="Source Limit",
             description="Limit the number of input points, 0 for unlimited (applies to recursion only)",
-            min=0, max=5000,
+            min=2, max=2000,
             default=8,
             )
-
     recursion_clamp: IntProperty(
             name="Clamp Recursion",
             description="Finish recursion when this number of objects is reached (prevents recursing for extended periods of time), zero disables",
             min=0, max=10000,
             default=250,
             )
-
     recursion_chance: FloatProperty(
             name="Random Factor",
             description="Likelihood of recursion",
             min=0.0, max=1.0,
             default=0.25,
             )
-
     recursion_chance_select: EnumProperty(
             name="Recurse Over",
             items=(('RANDOM', "Random", ""),
@@ -333,94 +330,40 @@ class FRACTURE_OT_Cell(Operator):
             )
 
     # -------------------------------------------------------------------------
-    # Mesh Data Options
-
+    # Interior Meshes Options
     use_smooth_faces: BoolProperty(
-            name="Smooth Interior",
+            name="Smooth Faces",
             description="Smooth Faces of inner side.",
             default=False,
             )
-
     use_sharp_edges: BoolProperty(
             name="Sharp Edges",
             description="Set sharp edges when disabled",
             default=True,
             )
-
     use_sharp_edges_apply: BoolProperty(
             name="Apply Split Edge",
             description="Split sharp hard edges",
             default=True,
             )
-
     use_data_match: BoolProperty(
             name="Match Data",
             description="Match original mesh materials and data layers",
             default=True,
             )
-
-    use_island_split: BoolProperty(
-            name="Split Islands",
-            description="Split disconnected meshes",
-            default=True,
-            )
-
-    margin: FloatProperty(
-            name="Margin",
-            description="Gaps for the fracture (gives more stable physics)",
-            min=0.0, max=1.0,
-            default=0.001,
-            )
-
     material_index: IntProperty(
             name="Material",
             description="Material index for interior faces",
             default=0,
             )
-
     use_interior_vgroup: BoolProperty(
-            name="Interior VGroup",
+            name="Vertex Group",
             description="Create a vertex group for interior verts",
             default=False,
             )
 
-
     # -------------------------------------------------------------------------
-    # Object Options
-
-    use_recenter: BoolProperty(
-            name="Recenter",
-            description="Recalculate the center points after splitting",
-            default=True,
-            )
-
-    use_remove_original: BoolProperty(
-            name="Remove Original",
-            description="Removes the parents used to create the shatter",
-            default=True,
-            )
-
-    # -------------------------------------------------------------------------
-    # Scene Options
-    #
-    # .. different from object options in that this controls how the objects
-    #    are setup in the scene.
-    
-    '''
-    use_layer_index: IntProperty(
-            name="Layer Index",
-            description="Layer to add the objects into or 0 for existing",
-            default=0,
-            min=0, max=20,
-            )
-
-    use_layer_next: BoolProperty(
-            name="Next Layer",
-            description="At the object into the next layer (layer index overrides)",
-            default=True,
-            )
-    '''
-    
+    # Scene Options    
     use_collection: BoolProperty(
             name="Use Collection",
             description="Use collection to organize fracture objects",
@@ -438,7 +381,14 @@ class FRACTURE_OT_Cell(Operator):
             description="Collection name.",
             default="Fracture",
             )
-
+    '''
+    use_remove_original: BoolProperty(
+            name="Remove Original",
+            description="Removes the parents used to create the shatter",
+            default=True,
+            )
+    '''
+    
     # -------------------------------------------------------------------------
     # Physics Options
     
@@ -507,22 +457,31 @@ class FRACTURE_OT_Cell(Operator):
         rowsub = col.row()
         #rowsub.prop(self, "source")
         rowsub.prop(self, "source_vert_own")
-        rowsub.prop(self, "source_vert_child")
         rowsub.prop(self, "source_particle_own")
-        rowsub.prop(self, "source_particle_child")
-        rowsub.prop(self, "source_pencil")
         rowsub.prop(self, "source_random")
         rowsub = col.row()
-        rowsub.prop(self, "source_limit")
+        rowsub.prop(self, "source_vert_child")
+        rowsub.prop(self, "source_particle_child")
+        rowsub.prop(self, "source_pencil")
+        
+        box = layout.box()
+        col = box.column()
+        col.label(text="Transform")
+        rowsub = col.row()
         rowsub.prop(self, "source_noise")
+        rowsub.prop(self, "margin")
         rowsub = col.row()
         rowsub.prop(self, "cell_scale")
+        rowsub = col.row()
+        rowsub.prop(self, "use_recenter")
+        # could be own section, control how we subdiv
+        rowsub.prop(self, "use_island_split")
 
         box = layout.box()
         col = box.column()
         col.label(text="Recursive Shatter")
         rowsub = col.row(align=True)
-        rowsub.prop(self, "recursion")
+        rowsub.prop(self, "recursion")          
         rowsub.prop(self, "recursion_source_limit")
         rowsub.prop(self, "recursion_clamp")
         rowsub = col.row()
@@ -531,7 +490,7 @@ class FRACTURE_OT_Cell(Operator):
 
         box = layout.box()
         col = box.column()
-        col.label(text="Mesh Data")
+        col.label(text="Interior Meshes")
         rowsub = col.row()
         rowsub.prop(self, "use_smooth_faces")
         rowsub.prop(self, "use_sharp_edges")
@@ -540,31 +499,19 @@ class FRACTURE_OT_Cell(Operator):
         rowsub = col.row()
 
         # on same row for even layout but infact are not all that related
-        rowsub.prop(self, "material_index")
         rowsub.prop(self, "use_interior_vgroup")
-
-        # could be own section, control how we subdiv
-        rowsub.prop(self, "margin")
-        rowsub.prop(self, "use_island_split")
-
+        rowsub.prop(self, "material_index")
 
         box = layout.box()
         col = box.column()
-        col.label(text="Object")
-        rowsub = col.row(align=True)
-        rowsub.prop(self, "use_recenter")
-
-
-        box = layout.box()
-        col = box.column()
-        col.label(text="Collection")
+        col.label(text="Scene Management")
         rowsub = col.row(align=True)
         rowsub.prop(self, "use_collection")
         if self.use_collection:
             rowsub.prop(self, "new_collection")
             rowsub.prop(self, "collection_name")
         
-        
+        '''
         box = layout.box()
         col = box.column()
         col.label(text="Custom Properties")
@@ -576,7 +523,7 @@ class FRACTURE_OT_Cell(Operator):
             rowsub = col.row(align=True)
             rowsub.prop(self, "mass_mode")
             rowsub.prop(self, "mass")
-
+        '''
         
         box = layout.box()
         col = box.column()

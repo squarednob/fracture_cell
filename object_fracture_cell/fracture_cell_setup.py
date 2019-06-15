@@ -61,10 +61,12 @@ def _points_from_object(obj, verts,
     
     points = []
     
+    # This is not used by anywhere
     def edge_center(mesh, edge):
         v1, v2 = edge.vertices
         return (mesh.vertices[v1].co + mesh.vertices[v2].co) / 2.0
-
+    
+    # This is not used by anywhere
     def poly_center(mesh, poly):
         from mathutils import Vector
         co = Vector()
@@ -73,6 +75,7 @@ def _points_from_object(obj, verts,
             co += mesh.vertices[mesh.loops[i].vertex_index].co
             tot += 1
         return co / tot
+    
 
     def points_from_verts(obj):
         """Takes points from _any_ object with geometry"""
@@ -100,10 +103,7 @@ def _points_from_object(obj, verts,
     def points_from_particles(obj):
         depsgraph = bpy.context.evaluated_depsgraph_get()
         obj_eval = obj.evaluated_get(depsgraph)
-        
-        #points.extend([p.location.copy()
-        #               for psys in obj_eval.particle_systems
-        #               for p in psys.particles])                
+                     
         p = [(particle.location.copy(), 'PARTICLE')
                for psys in obj_eval.particle_systems
                for particle in psys.particles]
@@ -133,7 +133,7 @@ def _points_from_object(obj, verts,
         new_points = _limit_source(new_points, source_vert_own)
         points.extend(new_points)
     
-    # geom random
+    # random
     if source_random > 0:
         new_points = points_from_random(obj, verts)
         points.extend(new_points)
@@ -254,18 +254,13 @@ def cell_fracture_objects(context, obj,
 
     if not points:
         assert points, "No points found"
-        #print("no points found")
-        #return []
-        #return 
-
-    
-    '''
+        
     # apply optional clamp
     if source_limit != 0 and source_limit < len(points):
         import random
         random.shuffle(points)
         points[source_limit:] = []
-    '''
+        print("limited")
 
     
     # saddly we cant be sure there are no doubles
@@ -273,7 +268,6 @@ def cell_fracture_objects(context, obj,
     to_tuple = Vector.to_tuple
     
     # To remove doubles, round the values.    
-    #points = list({to_tuple(p, 4): p for p in points}.values())
     points = [(Vector(to_tuple(p[0], 4)),p[1]) for p in points]
     del to_tuple
     del Vector
@@ -287,7 +281,6 @@ def cell_fracture_objects(context, obj,
         scalar = source_noise * ((bb_world[0] - bb_world[6]).length / 2.0)
 
         from mathutils.noise import random_unit_vector
-
         points[:] = [(p[0] + (random_unit_vector() * (scalar * random())), p[1]) for p in points]
 
     if use_debug_points:
@@ -300,12 +293,6 @@ def cell_fracture_objects(context, obj,
         obj_tmp = bpy.data.objects.new(name=mesh_tmp.name, object_data=mesh_tmp)
         collection.objects.link(obj_tmp)
         del obj_tmp, mesh_tmp
-
-    '''
-    mesh = obj.data
-    matrix = obj.matrix_world.copy()
-    verts = [matrix @ v.co for v in mesh.vertices]
-    '''
 
     cells = fracture_cell_calc.points_as_bmesh_cells(verts,
                                                      points,
@@ -323,7 +310,6 @@ def cell_fracture_objects(context, obj,
         # create the convex hulls
         bm = bmesh.new()
         
-        #この段階でセルの各点にランダム性を加えるより、前の点計算の段階でやったほうがいいのでは？　bm.verts.new(co)以外は。
         # WORKAROUND FOR CONVEX HULL BUG/LIMIT
         # XXX small noise
         import random
@@ -342,7 +328,6 @@ def cell_fracture_objects(context, obj,
             bm_vert = bm.verts.new(co)
 
         import mathutils
-        #　この重複削除の距離は、調節したいな。ただし、これより前の計算段階でできそうだが。
         bmesh.ops.remove_doubles(bm, verts=bm.verts, dist=0.005)
         try:
             # Making cell meshes as convex full here!
@@ -382,7 +367,6 @@ def cell_fracture_objects(context, obj,
             mesh_src = obj.data
             for mat in mesh_src.materials:
                 mesh_dst.materials.append(mat)
-            #for lay_attr in ("vertex_colors", "uv_textures"):
             for lay_attr in ("vertex_colors", "uv_layers"):
                 lay_src = getattr(mesh_src, lay_attr)
                 lay_dst = getattr(mesh_dst, lay_attr)
@@ -441,7 +425,6 @@ def cell_fracture_boolean(context, obj, objects,
     collection = context.collection
     scene = context.scene
     view_layer = context.view_layer
-    #depsgraph = context.evaluated_depsgraph_get()
 
     if use_interior_hide and level == 0:
         # only set for level 0
@@ -466,7 +449,7 @@ def cell_fracture_boolean(context, obj, objects,
             bpy.ops.object.modifier_apply(apply_as='DATA', modifier="Boolean")
             
             
-            # depsgraph sould be gotten after applign boolean modifier, for new_mesh.
+            # depsgraph sould be gotten after applied boolean modifier, for new_mesh.
             depsgraph = context.evaluated_depsgraph_get()
             obj_cell_eval = obj_cell.evaluated_get(depsgraph)
             
@@ -574,7 +557,7 @@ def cell_fracture_interior_handle(objects,
 
         if use_sharp_edges:
             bpy.context.space_data.overlay.show_edge_sharp = True
-            #mesh.show_edge_sharp = True
+            
             for bm_edge in bm.edges:
                 if len({bm_face.hide for bm_face in bm_edge.link_faces}) == 2:
                     bm_edge.smooth = False
