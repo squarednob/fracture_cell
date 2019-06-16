@@ -59,7 +59,7 @@ def main_object(context, obj, level, **kw):
     # pull out some args
     kw_copy = kw.copy()
     use_recenter = kw_copy.pop("use_recenter")
-    #use_remove_original = kw_copy.pop("use_remove_original")
+    use_remove_original = kw_copy.pop("use_remove_original")
     recursion = kw_copy.pop("recursion")
     recursion_source_limit = kw_copy.pop("recursion_source_limit")
     recursion_clamp = kw_copy.pop("recursion_clamp")
@@ -87,6 +87,7 @@ def main_object(context, obj, level, **kw):
         obj.display_type = 'WIRE'
 
     objects = fracture_cell_setup.cell_fracture_objects(context, obj, **kw_copy)
+    assert objects, "Can't make any fracture object."
     objects = fracture_cell_setup.cell_fracture_boolean(context, obj, objects,
                                                         use_island_split=use_island_split,
                                                         use_interior_hide=(use_interior_vgroup or use_sharp_edges),
@@ -99,14 +100,13 @@ def main_object(context, obj, level, **kw):
     if use_recenter:
         bpy.ops.object.origin_set({"selected_editable_objects": objects},
                                   type='ORIGIN_GEOMETRY', center='MEDIAN')
-    
+                                  
     #--------------
     # Recursion.
     if level == 0:
         for level_sub in range(1, recursion + 1):
 
             objects_recurse_input = [(i, o) for i, o in enumerate(objects)]
-
             if recursion_chance != 1.0:
                 from mathutils import Vector
                 if recursion_chance_select == 'RANDOM':
@@ -123,10 +123,10 @@ def main_object(context, obj, level, **kw):
                         (ob_pair[1].location - c).length_squared)
                     if recursion_chance_select == 'CURSOR_MAX':
                         objects_recurse_input.reverse()
-
+            
                 objects_recurse_input[int(recursion_chance * len(objects_recurse_input)):] = []
                 objects_recurse_input.sort()
-
+            
             # reverse index values so we can remove from original list.
             objects_recurse_input.reverse()
 
@@ -144,7 +144,7 @@ def main_object(context, obj, level, **kw):
 
             if recursion_clamp and len(objects) > recursion_clamp:
                 break
-
+    
     #--------------
     # Level Options
     if level == 0:
@@ -218,31 +218,31 @@ class FRACTURE_OT_Cell(Operator):
     source_vert_own: IntProperty(
             name="Own Verts",
             description="Use own vertices",
-            min=0, max=5000,
+            min=0, max=2000,
             default=100,
             )
     source_vert_child: IntProperty(
             name="Child Verts",
             description="Use child object vertices",
-            min=0, max=5000,
+            min=0, max=2000,
             default=0,
             )
     source_particle_own: IntProperty(
             name="Own Particles",
             description="All particle systems of the source object",
-            min=0, max=5000,
+            min=0, max=2000,
             default=0,
             )
     source_particle_child: IntProperty(
             name="Child Particles",
             description="All particle systems of the child objects",
-            min=0, max=5000,
+            min=0, max=2000,
             default=0,
             )
     source_pencil: IntProperty(
             name="Annotation Pencil",
             description="Annotation Grease Pencil",
-            min=0, max=100,
+            min=0, max=2000,
             default=0,
             )
     source_random: IntProperty(
@@ -301,25 +301,25 @@ class FRACTURE_OT_Cell(Operator):
             default=0,
             )
     recursion_source_limit: IntProperty(
-            name="Source Limit",
+            name="Fracture Each",
             description="Limit the number of input points, 0 for unlimited (applies to recursion only)",
-            min=2, max=2000,
+            min=2, max=2000, # Oviously, dividing in more than two objects is needed, to avoid no fracture object. 
             default=8,
             )
     recursion_clamp: IntProperty(
-            name="Clamp Recursion",
+            name="Max Fracture",
             description="Finish recursion when this number of objects is reached (prevents recursing for extended periods of time), zero disables",
             min=0, max=10000,
             default=250,
             )
     recursion_chance: FloatProperty(
-            name="Random Factor",
+            name="Recursion Chance",
             description="Likelihood of recursion",
             min=0.0, max=1.0,
-            default=0.25,
+            default=1.00,
             )
     recursion_chance_select: EnumProperty(
-            name="Recurse Over",
+            name="Target",
             items=(('RANDOM', "Random", ""),
                    ('SIZE_MIN', "Small", "Recursively subdivide smaller objects"),
                    ('SIZE_MAX', "Big", "Recursively subdivide bigger objects"),
@@ -347,12 +347,12 @@ class FRACTURE_OT_Cell(Operator):
             default=True,
             )
     use_data_match: BoolProperty(
-            name="Match Data",
+            name="Copy Original Data",
             description="Match original mesh materials and data layers",
             default=True,
             )
     material_index: IntProperty(
-            name="Material",
+            name="Interior Material Slot",
             description="Material index for interior faces",
             default=0,
             )
@@ -381,13 +381,13 @@ class FRACTURE_OT_Cell(Operator):
             description="Collection name.",
             default="Fracture",
             )
-    '''
+
+
     use_remove_original: BoolProperty(
             name="Remove Original",
             description="Removes the parents used to create the shatter",
             default=True,
             )
-    '''
     
     # -------------------------------------------------------------------------
     # Physics Options
@@ -470,9 +470,10 @@ class FRACTURE_OT_Cell(Operator):
         rowsub = col.row()
         rowsub.prop(self, "source_noise")
         rowsub.prop(self, "margin")
-        rowsub = col.row()
+        rowsub = col.row(align=True)
+        #rowsub.alignment = 'RIGHT'
+        
         rowsub.prop(self, "cell_scale")
-        rowsub = col.row()
         rowsub.prop(self, "use_recenter")
         # could be own section, control how we subdiv
         rowsub.prop(self, "use_island_split")
@@ -480,38 +481,41 @@ class FRACTURE_OT_Cell(Operator):
         box = layout.box()
         col = box.column()
         col.label(text="Recursive Shatter")
+        #rowsub = col.row(align=True)
         rowsub = col.row(align=True)
-        rowsub.prop(self, "recursion")          
+        rowsub.alignment = 'LEFT'
+        rowsub.prop(self, "recursion")
+        rowsub = col.row(align=True)
+        rowsub.alignment = 'LEFT'
+        if self.recursion > 0:
+            rowsub.enabled = True
+        else:
+            rowsub.enabled = False
         rowsub.prop(self, "recursion_source_limit")
         rowsub.prop(self, "recursion_clamp")
-        rowsub = col.row()
-        rowsub.prop(self, "recursion_chance")
-        rowsub.prop(self, "recursion_chance_select", expand=True)
+        rowsub.prop(self, "recursion_chance")      
+        rowsub.prop(self, "recursion_chance_select") #, expand=True)
 
         box = layout.box()
         col = box.column()
         col.label(text="Interior Meshes")
         rowsub = col.row()
-        rowsub.prop(self, "use_smooth_faces")
+        rowsub.alignment = 'LEFT'
+        rowsub.prop(self, "use_data_match")       
         rowsub.prop(self, "use_sharp_edges")
         rowsub.prop(self, "use_sharp_edges_apply")
-        rowsub.prop(self, "use_data_match")
+        rowsub.prop(self, "use_smooth_faces")
+        rowsub.prop(self, "use_interior_vgroup") 
+                
         rowsub = col.row()
-
-        # on same row for even layout but infact are not all that related
-        rowsub.prop(self, "use_interior_vgroup")
+        if self.use_data_match == True:
+            rowsub.enabled = True
+        else:
+            rowsub.enabled = False
+        rowsub.alignment = 'LEFT'
+        # on same row for even layout but infact are not all that related       
         rowsub.prop(self, "material_index")
 
-        box = layout.box()
-        col = box.column()
-        col.label(text="Scene Management")
-        rowsub = col.row(align=True)
-        rowsub.prop(self, "use_collection")
-        if self.use_collection:
-            rowsub.prop(self, "new_collection")
-            rowsub.prop(self, "collection_name")
-        
-        '''
         box = layout.box()
         col = box.column()
         col.label(text="Custom Properties")
@@ -523,8 +527,18 @@ class FRACTURE_OT_Cell(Operator):
             rowsub = col.row(align=True)
             rowsub.prop(self, "mass_mode")
             rowsub.prop(self, "mass")
-        '''
+ 
+        box = layout.box()
+        col = box.column()
+        col.label(text="Scene Management")
+        rowsub = col.row(align=True)
+        rowsub.prop(self, "use_collection")
+        if self.use_collection:
+            rowsub.prop(self, "new_collection")
+            rowsub.prop(self, "collection_name")
         
+
+                
         box = layout.box()
         col = box.column()
         col.label(text="Debug")

@@ -256,12 +256,14 @@ def cell_fracture_objects(context, obj,
         assert points, "No points found"
         
     # apply optional clamp
+    print("nikai")
     if source_limit != 0 and source_limit < len(points):
+        objects = _limit_source(points, source_limit)
+    '''
         import random
         random.shuffle(points)
         points[source_limit:] = []
-        print("limited")
-
+    '''
     
     # saddly we cant be sure there are no doubles
     from mathutils import Vector
@@ -293,12 +295,12 @@ def cell_fracture_objects(context, obj,
         obj_tmp = bpy.data.objects.new(name=mesh_tmp.name, object_data=mesh_tmp)
         collection.objects.link(obj_tmp)
         del obj_tmp, mesh_tmp
-
+    
     cells = fracture_cell_calc.points_as_bmesh_cells(verts,
                                                      points,
                                                      cell_scale,
                                                      margin_cell=margin)
-
+    
     # some hacks here :S
     cell_name = obj.name + "_cell"
 
@@ -397,7 +399,6 @@ def cell_fracture_objects(context, obj,
             _redraw_yasiamevil()
 
     view_layer.update()
-
     # move this elsewhere...
     # Blender 2.8: BGE integration was disabled, --
     # -- because BGE was deleted in Blender 2.8. 
@@ -425,7 +426,7 @@ def cell_fracture_boolean(context, obj, objects,
     collection = context.collection
     scene = context.scene
     view_layer = context.view_layer
-
+    
     if use_interior_hide and level == 0:
         # only set for level 0
         obj.data.polygons.foreach_set("hide", [False] * len(obj.data.polygons))  
@@ -436,8 +437,6 @@ def cell_fracture_boolean(context, obj, objects,
         mod.object = obj
         mod.operation = 'INTERSECT'
         
-        
-
         if not use_debug_bool:
             if use_interior_hide:
                 obj_cell.data.polygons.foreach_set("hide", [True] * len(obj_cell.data.polygons))
@@ -507,7 +506,7 @@ def cell_fracture_boolean(context, obj, objects,
 
             if use_debug_redraw:
                 _redraw_yasiamevil()
-    
+
     if (not use_debug_bool) and use_island_split:
         # this is ugly and Im not proud of this - campbell
         for ob in view_layer.objects:
@@ -516,7 +515,9 @@ def cell_fracture_boolean(context, obj, objects,
             obj_cell.select_set(True)
         
         # If new separated meshes are made, selected objects is increased.
-        bpy.ops.mesh.separate(type='LOOSE')
+        if objects_boolean:
+            bpy.ops.mesh.separate(type='LOOSE')
+
         objects_boolean[:] = [obj_cell for obj_cell in scene.objects if obj_cell.select_get()]
      
     context.view_layer.update()
