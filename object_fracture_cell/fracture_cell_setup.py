@@ -256,7 +256,6 @@ def cell_fracture_objects(context, obj,
         assert points, "No points found"
         
     # apply optional clamp
-    print("nikai")
     if source_limit != 0 and source_limit < len(points):
         objects = _limit_source(points, source_limit)
     '''
