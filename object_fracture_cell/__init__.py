@@ -18,10 +18,10 @@
 
 bl_info = {
     "name": "Cell Fracture",
-    "author": "ideasman42, phymec, Sergey Sharybin",
-    "version": (0, 1),
+    "author": "ideasman42, phymec, Sergey Sharybin", "Nobuyuki Hirakata"
+    "version": (0, 2),
     "blender": (2, 80, 0),
-    "location": "Edit panel of Tools tab, in Object mode, 3D View tools",
+    "location": "View3D > Sidebar > Transform tab",
     "description": "Fractured Object, Bomb, Projectile, Recorder",
     "warning": "",
     "wiki_url": "http://wiki.blender.org/index.php/Extensions:2.6/Py/"
