@@ -212,7 +212,7 @@ class FRACTURE_OT_Crack(Operator):
 
         box = layout.box()
         col = box.column()
-        col.label(text="* Execute After 1.Cell Fracture")
+        col.label(text='* Execute After "1. Cell Fracture"')
         
         box = layout.box()
         col = box.column()
