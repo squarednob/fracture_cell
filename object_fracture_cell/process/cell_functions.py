@@ -1,25 +1,3 @@
-# ##### BEGIN GPL LICENSE BLOCK #####
-#
-#  This program is free software; you can redistribute it and/or
-#  modify it under the terms of the GNU General Public License
-#  as published by the Free Software Foundation; either version 2
-#  of the License, or (at your option) any later version.
-#
-#  This program is distributed in the hope that it will be useful,
-#  but WITHOUT ANY WARRANTY; without even the implied warranty of
-#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-#  GNU General Public License for more details.
-#
-#  You should have received a copy of the GNU General Public License
-#  along with this program; if not, write to the Free Software Foundation,
-#  Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
-#
-# ##### END GPL LICENSE BLOCK #####
-
-# <pep8 compliant>
-
-# Script copyright (C) Blender Foundation 2012
-
 import bpy
 import bmesh
 
@@ -38,26 +16,35 @@ def _limit_source(points, source_limit):
     else:
         return points
 
-def _points_from_object(obj, verts,
-                        source_vert_own,
-                        source_vert_child,
-                        source_particle_own,
-                        source_particle_child,
-                        source_pencil,
-                        source_random):
-    
-    '''
-    _source_all = {
-        'PARTICLE_OWN', 'PARTICLE_CHILD',
-        'PENCIL',
-        'VERT_OWN', 'VERT_CHILD',
-        }
-    
-    print(source - _source_all)
-    print(source)
-    assert(len(source | _source_all) == len(_source_all))
-    assert(len(source))
-    '''
+
+def simplify_original(original, pre_simplify):
+    bpy.context.view_layer.objects.active = original
+    bpy.ops.object.modifier_add(type='DECIMATE')
+    decimate = bpy.context.object.modifiers[-1]
+    decimate.name = 'DECIMATE_crackit_original'
+    decimate.ratio = 1-pre_simplify
+
+def desimplify_original(original):
+    bpy.context.view_layer.objects.active = original
+    if 'DECIMATE_crackit_original' in bpy.context.object.modifiers.keys():
+        bpy.ops.object.modifier_remove(modifier='DECIMATE_crackit_original')
+
+def original_minmax(original_verts):
+    xa = [v[0] for v in original_verts]
+    ya = [v[1] for v in original_verts]
+    za = [v[2] for v in original_verts]
+    xmin, xmax = min(xa), max(xa)
+    ymin, ymax = min(ya), max(ya)
+    zmin, zmax = min(za), max(za)
+    return {"x":(xmin,xmax), "y":(ymin,ymax), "z":(zmin,zmax)}
+
+def points_from_object(original, original_xyz_minmax,
+                       source_vert_own=100,
+                       source_vert_child=0,
+                       source_particle_own=0,
+                       source_particle_child=0,
+                       source_pencil=0,
+                       source_random=0):
     
     points = []
     
@@ -76,46 +63,40 @@ def _points_from_object(obj, verts,
             tot += 1
         return co / tot
     
-
-    def points_from_verts(obj):
+    def points_from_verts(original):
         """Takes points from _any_ object with geometry"""
-        if obj.type == 'MESH':
-            mesh = obj.data
-            matrix = obj.matrix_world.copy()    
-            p = [(matrix @ v.co, 'VERTS') for v in mesh.vertices]
-            
+        if original.type == 'MESH':
+            mesh = original.data
+            matrix = original.matrix_world.copy()    
+            p = [(matrix @ v.co, 'VERTS') for v in mesh.vertices]            
             return p
         else:
             depsgraph = bpy.context.evaluated_depsgraph_get()
-            ob_eval = obj.evaluated_get(depsgraph)
+            ob_eval = original.evaluated_get(depsgraph)
             try:
                 mesh = ob_eval.to_mesh()
             except:
                 mesh = None
 
             if mesh is not None:               
-                matrix = obj.matrix_world.copy()
-                p =  [(matrix @ v.co, 'VERTS') for v in mesh.vertices]
-                
+                matrix = original.matrix_world.copy()
+                p =  [(matrix @ v.co, 'VERTS') for v in mesh.vertices]              
                 ob_eval.to_mesh_clear()
                 return p
 
-    def points_from_particles(obj):
+    def points_from_particles(original):
         depsgraph = bpy.context.evaluated_depsgraph_get()
-        obj_eval = obj.evaluated_get(depsgraph)
+        obj_eval = original.evaluated_get(depsgraph)
                      
         p = [(particle.location.copy(), 'PARTICLE')
                for psys in obj_eval.particle_systems
                for particle in psys.particles]
         return p
     
-    def points_from_random(obj, verts):
-        xa = [v[0] for v in verts]
-        ya = [v[1] for v in verts]
-        za = [v[2] for v in verts]
-        xmin, xmax = min(xa), max(xa)
-        ymin, ymax = min(ya), max(ya)
-        zmin, zmax = min(za), max(za)
+    def points_from_random(original, original_xyz_minmax):
+        xmin, xmax = original_xyz_minmax["x"]
+        ymin, ymax = original_xyz_minmax["y"]
+        zmin, zmax = original_xyz_minmax["z"]
 
         from random import uniform
         from mathutils import Vector
@@ -123,38 +104,37 @@ def _points_from_object(obj, verts,
         p = []
         for i in range(source_random):
             new_pos = Vector( (uniform(xmin, xmax), uniform(ymin, ymax), uniform(zmin, zmax)) )
-            p.append((new_pos, 'RANDOM'))
-  
+            p.append((new_pos, 'RANDOM')) 
         return p  
     
      # geom own
     if source_vert_own > 0:
-        new_points = points_from_verts(obj)
+        new_points = points_from_verts(original)
         new_points = _limit_source(new_points, source_vert_own)
         points.extend(new_points)
     
     # random
     if source_random > 0:
-        new_points = points_from_random(obj, verts)
+        new_points = points_from_random(original, original_xyz_minmax)
         points.extend(new_points)
 
 
     # geom children
     if source_vert_child > 0:
-        for obj_child in obj.children:
-            new_points  = points_from_verts(obj_child, verts)
+        for original_child in original.children:
+            new_points  = points_from_verts(original_child)
             new_points = _limit_source(new_points, source_vert_child)
             points.extend(new_points)
     
     # geom particles
     if source_particle_own > 0:
-        new_points = points_from_particles(obj)
+        new_points = points_from_particles(original)
         new_points = _limit_source(new_points, source_particle_own)
         points.extend(new_points)
 
     if source_particle_child > 0:
-        for obj_child in obj.children:
-            new_points = points_from_particles(obj_child)
+        for original_child in original.children:
+            new_points = points_from_particles(original_child)
             new_points = _limit_source(new_points, source_particle_child)
             points.extend(new_points)
 
@@ -172,97 +152,57 @@ def _points_from_object(obj, verts,
                 gpl.active_frame = current
                 fr = gpl.active_frame
             
-            return [get_points(stroke) for stroke in fr.strokes]
-        
+            return [get_points(stroke) for stroke in fr.strokes]     
         else:
             return []
 
     if source_pencil > 0:   
-        gp = bpy.context.scene.grease_pencil
-        
+        gp = bpy.context.scene.grease_pencil        
         if gp:
+            line_points = []
             line_points = [(p, 'PENCIL') for spline in get_splines(gp)
                              for p in spline]
-            line_points = _limit_source(line_points, source_pencil)
+            if len(line_points) > 0:
+                line_points = _limit_source(line_points, source_pencil)
 
-        # Make New point between the line point and the closest point.
-        if not points:
-            points.extend(line_points)
-            
-        else:
-            for lp in line_points:
-                # Make vector between the line point and its closest point.
-                points.sort(key=lambda p: (p[0] - lp[0]).length_squared)
-                closest_point = points[0]           
-                normal = lp[0].xyz - closest_point[0].xyz
-                           
-                new_point = (lp[0], lp[1])
-                new_point[0].xyz +=  normal / 2
-               
-                points.append(new_point)
-    
+                # Make New point between the line point and the closest point.
+                if not points:
+                    points.extend(line_points)
+                    
+                else:
+                    for lp in line_points:
+                        # Make vector between the line point and its closest point.
+                        points.sort(key=lambda p: (p[0] - lp[0]).length_squared)
+                        closest_point = points[0]           
+                        normal = lp[0].xyz - closest_point[0].xyz
+                                   
+                        new_point = (lp[0], lp[1])
+                        new_point[0].xyz +=  normal / 2
+                       
+                        points.append(new_point)
     #print("Found %d points" % len(points))
     return points
 
 
-def cell_fracture_objects(context, obj,
-                          # Source From
-                          source_vert_own=100,
-                          source_vert_child=0,
-                          source_particle_own=0,
-                          source_particle_child=0,
-                          source_pencil=0,
-                          source_random=0,
-                          source_limit=0,
-                          source_noise=0.0,
-                          clean=True,
-                          # operator options
-                          use_smooth_faces=False,
-                          use_data_match=False,
-                          use_debug_points=False,
-                          margin=0.0,
-                          material_index=0,
-                          use_debug_redraw=False,
-                          cell_scale=(1.0, 1.0, 1.0),
-                          ):
+def points_to_cells(context, original, original_xyz_minmax, points,
+                    source_limit=0,
+                    source_noise=0.0,                        
+                    use_smooth_faces=False,
+                    use_data_match=False,
+                    use_debug_points=False,
+                    margin=0.0,
+                    material_index=0,
+                    use_debug_redraw=False,
+                    cell_scale=(1.0, 1.0, 1.0),
+                    clean=True):
 
-    from . import fracture_cell_calc
+    from . import cell_calc
     collection = context.collection
     view_layer = context.view_layer
-    
-    mesh = obj.data
-    matrix = obj.matrix_world.copy()
-    verts = [matrix @ v.co for v in mesh.vertices]
-    
-    # -------------------------------------------------------------------------
-    # GET POINTS
-    points = _points_from_object(obj, verts,
-                                source_vert_own,
-                                source_vert_child,
-                                source_particle_own,
-                                source_particle_child,
-                                source_pencil,
-                                source_random
-                                )
-    
-    '''
-    if not points:
-        # print using fallback
-        #points = _points_from_object(obj, {'VERT_OWN'})
-        _points_from_object(obj, source_vert_own, 0,0,0,0)
-    '''
-
-    if not points:
-        assert points, "No points found"
         
     # apply optional clamp
     if source_limit != 0 and source_limit < len(points):
-        objects = _limit_source(points, source_limit)
-    '''
-        import random
-        random.shuffle(points)
-        points[source_limit:] = []
-    '''
+        points = _limit_source(points, source_limit)
     
     # saddly we cant be sure there are no doubles
     from mathutils import Vector
@@ -277,8 +217,8 @@ def cell_fracture_objects(context, obj,
         from random import random
         # boundbox approx of overall scale
         from mathutils import Vector
-        matrix = obj.matrix_world.copy()
-        bb_world = [matrix @ Vector(v) for v in obj.bound_box]
+        matrix = original.matrix_world.copy()
+        bb_world = [matrix @ Vector(v) for v in original.bound_box]
         scalar = source_noise * ((bb_world[0] - bb_world[6]).length / 2.0)
 
         from mathutils.noise import random_unit_vector
@@ -295,19 +235,16 @@ def cell_fracture_objects(context, obj,
         collection.objects.link(obj_tmp)
         del obj_tmp, mesh_tmp
     
-    cells = fracture_cell_calc.points_as_bmesh_cells(verts,
-                                                     points,
-                                                     cell_scale,
-                                                     margin_cell=margin)
-    
+    cells_verts = cell_calc.points_to_verts(original_xyz_minmax,
+                                            points,
+                                            cell_scale,
+                                            margin_cell=margin)    
     # some hacks here :S
-    cell_name = obj.name + "_cell"
-
-    objects = []
-    for center_point, cell_points in cells:
+    cell_name = original.name + "_cell"
+    cells = []
+    for center_point, cell_verts in cells_verts:
         # ---------------------------------------------------------------------
         # BMESH
-
         # create the convex hulls
         bm = bmesh.new()
         
@@ -316,16 +253,11 @@ def cell_fracture_objects(context, obj,
         import random
         def R():
             return (random.random() - 0.5) * 0.001
-        # XXX small noise
-
-        for i, co in enumerate(cell_points):
-
-            # XXX small noise
+        
+        for i, co in enumerate(cell_verts):
             co.x += R()
             co.y += R()
             co.z += R()
-            # XXX small noise
-
             bm_vert = bm.verts.new(co)
 
         import mathutils
@@ -353,7 +285,6 @@ def cell_fracture_objects(context, obj,
             for bm_face in bm.faces:
                 bm_face.material_index = material_index
 
-
         # ---------------------------------------------------------------------
         # MESH
         mesh_dst = bpy.data.meshes.new(name=cell_name)
@@ -365,7 +296,7 @@ def cell_fracture_objects(context, obj,
         if use_data_match:
             # match materials and data layers so boolean displays them
             # currently only materials + data layers, could do others...
-            mesh_src = obj.data
+            mesh_src = original.data
             for mat in mesh_src.materials:
                 mesh_dst.materials.append(mat)
             for lay_attr in ("vertex_colors", "uv_layers"):
@@ -376,19 +307,16 @@ def cell_fracture_objects(context, obj,
 
         # ---------------------------------------------------------------------
         # OBJECT
-
-        obj_cell = bpy.data.objects.new(name=cell_name, object_data=mesh_dst)
-        collection.objects.link(obj_cell)
-        # scene.objects.active = obj_cell
-        obj_cell.location = center_point
-
-        objects.append(obj_cell)
+        cell = bpy.data.objects.new(name=cell_name, object_data=mesh_dst)
+        collection.objects.link(cell)
+        cell.location = center_point
+        cells.append(cell)
 
         # support for object materials
         if use_data_match:
             for i in range(len(mesh_dst.materials)):
-                slot_src = obj.material_slots[i]
-                slot_dst = obj_cell.material_slots[i]
+                slot_src = original.material_slots[i]
+                slot_dst = cell.material_slots[i]
 
                 slot_dst.link = slot_src.link
                 slot_dst.material = slot_src.material
@@ -402,61 +330,71 @@ def cell_fracture_objects(context, obj,
     # Blender 2.8: BGE integration was disabled, --
     # -- because BGE was deleted in Blender 2.8. 
     '''
-    for obj_cell in objects:
-        game = obj_cell.game
+    for cell in cells:
+        game = cell.game
         game.physics_type = 'RIGID_BODY'
         game.use_collision_bounds = True
         game.collision_bounds_type = 'CONVEX_HULL'
     '''
-    return objects
+    return cells
 
 
-def cell_fracture_boolean(context, obj, objects,
-                          use_debug_bool=False,
-                          clean=True,
-                          use_island_split=False,
-                          use_interior_hide=False,
-                          use_debug_redraw=False,
-                          level=0,
-                          remove_doubles=True
-                          ):
+def cell_boolean(context, original, cells,
+                use_debug_bool=False,
+                clean=True,
+                use_island_split=False,
+                use_interior_hide=False,
+                use_debug_redraw=False,
+                level=0,
+                remove_doubles=True
+                ):
 
-    objects_boolean = []
+    cells_boolean = []
     collection = context.collection
     scene = context.scene
     view_layer = context.view_layer
-    
+        
     if use_interior_hide and level == 0:
         # only set for level 0
-        obj.data.polygons.foreach_set("hide", [False] * len(obj.data.polygons))  
+        original.data.polygons.foreach_set("hide", [False] * len(original.data.polygons))  
     
+    # The first object can't be applied by bool, so it is used as a no-effect first straw-man.
+    bpy.ops.mesh.primitive_cube_add(enter_editmode=False, location=(original.location.x+10000000000.0, 0, 0))
+    temp_cell = bpy.context.active_object
+    cells.insert(0, temp_cell)
     
-    for obj_cell in objects:
-        mod = obj_cell.modifiers.new(name="Boolean", type='BOOLEAN')
-        mod.object = obj
-        mod.operation = 'INTERSECT'
-        
+    bpy.ops.object.select_all(action='DESELECT')  
+    for i, cell in enumerate(cells):
         if not use_debug_bool:
             if use_interior_hide:
-                obj_cell.data.polygons.foreach_set("hide", [True] * len(obj_cell.data.polygons))
+                cell.data.polygons.foreach_set("hide", [True] * len(cell.data.polygons))
             
             # mesh_old should be made before appling boolean modifier.
-            mesh_old = obj_cell.data
+            mesh_old = cell.data
                        
-            bpy.context.view_layer.objects.active = obj_cell
-            bpy.ops.object.modifier_apply(apply_as='DATA', modifier="Boolean")
+            original.select_set(True)
+            cell.select_set(True)
+            bpy.context.view_layer.objects.active = cell
+            bpy.ops.btool.boolean_inters()
+            bpy.ops.object.modifier_apply(apply_as='DATA', modifier="BTool_" + original.name)
             
+            if i == 0:
+                bpy.data.objects.remove(cell, do_unlink=True)
+                continue
+                        
+            cell = bpy.context.active_object
+            cell.select_set(False)
             
             # depsgraph sould be gotten after applied boolean modifier, for new_mesh.
             depsgraph = context.evaluated_depsgraph_get()
-            obj_cell_eval = obj_cell.evaluated_get(depsgraph)
+            cell_eval = cell.evaluated_get(depsgraph)
             
-            mesh_new = bpy.data.meshes.new_from_object(obj_cell_eval,)            
-            obj_cell.data = mesh_new
+            mesh_new = bpy.data.meshes.new_from_object(cell_eval)            
+            cell.data = mesh_new
             
             '''
-            check_hide = [11] * len(obj_cell.data.polygons)
-            obj_cell.data.polygons.foreach_get("hide", check_hide)
+            check_hide = [11] * len(cell.data.polygons)
+            cell.data.polygons.foreach_get("hide", check_hide)
             print(check_hide) 
             '''
             
@@ -464,10 +402,10 @@ def cell_fracture_boolean(context, obj, objects,
             if not mesh_old.users:
                 bpy.data.meshes.remove(mesh_old)
             if not mesh_new.vertices:
-                collection.objects.unlink(obj_cell)
-                if not obj_cell.users:
-                    bpy.data.objects.remove(obj_cell)
-                    obj_cell = None
+                collection.objects.unlink(cell)
+                if not cell.users:
+                    bpy.data.objects.remove(cell)
+                    cell = None
                     if not mesh_new.users:
                         bpy.data.meshes.remove(mesh_new)
                         mesh_new = None
@@ -500,41 +438,42 @@ def cell_fracture_boolean(context, obj, objects,
             del mesh_new
             del mesh_old
 
-        if obj_cell is not None:
-            objects_boolean.append(obj_cell)
+        if cell is not None:
+            cells_boolean.append(cell)
 
             if use_debug_redraw:
                 _redraw_yasiamevil()
-
+    
+    bpy.context.view_layer.objects.active = original
+    bpy.ops.btool.remove(thisObj=original.name, Prop="THIS")
+    
     if (not use_debug_bool) and use_island_split:
         # this is ugly and Im not proud of this - campbell
         for ob in view_layer.objects:
             ob.select_set(False)
-        for obj_cell in objects_boolean:
-            obj_cell.select_set(True)
-        
+        for cell in cells_boolean:
+            cell.select_set(True)        
         # If new separated meshes are made, selected objects is increased.
-        if objects_boolean:
+        if cells_boolean:
             bpy.ops.mesh.separate(type='LOOSE')
 
-        objects_boolean[:] = [obj_cell for obj_cell in scene.objects if obj_cell.select_get()]
+        cells_boolean[:] = [cell for cell in scene.objects if cell.select_get()]
      
-    context.view_layer.update()
-    
-    return objects_boolean
+    context.view_layer.update()    
+    return cells_boolean
 
 
-def cell_fracture_interior_handle(objects,
-                                  use_interior_vgroup=False,
-                                  use_sharp_edges=False,
-                                  use_sharp_edges_apply=False,
-                                  ):
+def interior_handle(cells,
+                    use_interior_vgroup=False,
+                    use_sharp_edges=False,
+                    use_sharp_edges_apply=False,
+                    ):
     """Run after doing _all_ booleans"""
 
     assert(use_interior_vgroup or use_sharp_edges or use_sharp_edges_apply)
 
-    for obj_cell in objects:
-        mesh = obj_cell.data
+    for cell in cells:
+        mesh = cell.data
         bm = bmesh.new()
         bm.from_mesh(mesh)
 
@@ -553,7 +492,7 @@ def cell_fracture_interior_handle(objects,
                     bm_vert[defvert_lay][0] = 1.0
 
             # add a vgroup
-            obj_cell.vertex_groups.new(name="Interior")
+            cell.vertex_groups.new(name="Interior")
 
         if use_sharp_edges:
             bpy.context.space_data.overlay.show_edge_sharp = True
@@ -563,25 +502,36 @@ def cell_fracture_interior_handle(objects,
                     bm_edge.smooth = False
 
             if use_sharp_edges_apply:
+                bpy.context.view_layer.objects.active = cell
+                bpy.ops.object.modifier_add(type='EDGE_SPLIT')
+
+                edge_split = bpy.context.object.modifiers[-1]
+                edge_split.name = 'EDGE_SPLIT_cell'
+                edge_split.use_edge_angle = False
+
+                '''
                 edges = [edge for edge in bm.edges if edge.smooth is False]
                 if edges:
                     bm.normal_update()
                     bmesh.ops.split_edges(bm, edges=edges)
-
+                '''
+                
         for bm_face in bm.faces:
             bm_face.hide = False
 
         bm.to_mesh(mesh)
         bm.free()
 
-def cell_fracture_post_process(objects,
-                                  use_collection=False,
-                                  new_collection=False,
-                                  collection_name="Fracture",
-                                  use_mass=False,
-                                  mass=1.0,
-                                  mass_mode='VOLUME', mass_name='mass',
-                                  ):
+
+def post_process(cells,
+                use_collection=False,
+                new_collection=False,
+                collection_name="Fracture",
+                use_mass=False,
+                mass=1.0,
+                mass_mode='VOLUME', mass_name='mass',
+                ):
+    
     """Run after Interiro handle"""
     #--------------
     # Collection Options   
@@ -599,8 +549,8 @@ def cell_fracture_post_process(objects,
             bpy.context.scene.collection.children.link(colle)
             
         # Cell objects are only link to the collection.
-        bpy.ops.collection.objects_remove_all() # For all selected object.
-        for colle_obj in objects:           
+        bpy.ops.collection.objects_remove_all() # For all selected object.        
+        for colle_obj in cells:           
             colle.objects.link(colle_obj)
 
     #--------------
@@ -609,18 +559,18 @@ def cell_fracture_post_process(objects,
         # Blender 2.8:  Mass for BGE was no more available.--
         # -- Instead, Mass values is used for custom properies on cell objects.
         if mass_mode == 'UNIFORM':
-            for obj_cell in objects:
-                #obj_cell.game.mass = mass
-                obj_cell[mass_name] = mass
+            for cell in cells:
+                #cell.game.mass = mass
+                cell[mass_name] = mass
         elif mass_mode == 'VOLUME':
             from mathutils import Vector
-            def _get_volume(obj_cell):
+            def _get_volume(cell):
                 def _getObjectBBMinMax():
                     min_co = Vector((1000000.0, 1000000.0, 1000000.0))
                     max_co = -min_co
-                    matrix = obj_cell.matrix_world
+                    matrix = cell.matrix_world
                     for i in range(0, 8):
-                        bb_vec = obj_cell.matrix_world @ Vector(obj_cell.bound_box[i])
+                        bb_vec = cell.matrix_world @ Vector(cell.bound_box[i])
                         min_co[0] = min(bb_vec[0], min_co[0])
                         min_co[1] = min(bb_vec[1], min_co[1])
                         min_co[2] = min(bb_vec[2], min_co[2])
@@ -639,13 +589,11 @@ def cell_fracture_post_process(objects,
 
                 return _getObjectVolume()
 
-
-            obj_volume_ls = [_get_volume(obj_cell) for obj_cell in objects]
-            obj_volume_tot = sum(obj_volume_ls)
-            if obj_volume_tot > 0.0:
-                mass_fac = mass / obj_volume_tot
-                for i, obj_cell in enumerate(objects):
-                    #obj_cell.game.mass = obj_volume_ls[i] * mass_fac
-                    obj_cell[mass_name] = obj_volume_ls[i] * mass_fac
+            cell_volume_ls = [_get_volume(cell) for cell in cells]
+            cell_volume_tot = sum(cell_volume_ls)
+            if cell_volume_tot > 0.0:
+                mass_fac = mass / cell_volume_tot
+                for i, cell in enumerate(cells):
+                    cell[mass_name] = cell_volume_ls[i] * mass_fac
         else:
-            assert(0)    
+            assert(0)
