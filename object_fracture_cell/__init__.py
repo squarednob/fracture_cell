@@ -19,11 +19,11 @@
 bl_info = {
     "name": "Cell Fracture",
     "author": "ideasman42, phymec, Sergey Sharybin, Nobuyuki Hirakata",
-    "version": (1, 0),
+    "version": (1, 0, 1),
     "blender": (2, 80, 0),
     "location": "View3D > Sidebar > Transform tab",
     "description": "Fractured Object, or Cracked Surface",
-    "warning": "",
+    "warning": "Work in Progress",
     "wiki_url": "http://wiki.blender.org/index.php/Extensions:2.6/Py/"
                 "Scripts/Object/CellFracture",
     "category": "Object"}

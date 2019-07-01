@@ -365,11 +365,10 @@ def cell_boolean(context, original, cells,
     
     bpy.ops.object.select_all(action='DESELECT')  
     for i, cell in enumerate(cells):
-    
         mod = cell.modifiers.new(name="Boolean", type='BOOLEAN')
         mod.object = original
         mod.operation = 'INTERSECT'
-        
+
         if not use_debug_bool:
             if use_interior_hide:
                 cell.data.polygons.foreach_set("hide", [True] * len(cell.data.polygons))
