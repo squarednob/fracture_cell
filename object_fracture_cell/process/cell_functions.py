@@ -365,6 +365,11 @@ def cell_boolean(context, original, cells,
     
     bpy.ops.object.select_all(action='DESELECT')  
     for i, cell in enumerate(cells):
+    
+        mod = cell.modifiers.new(name="Boolean", type='BOOLEAN')
+        mod.object = original
+        mod.operation = 'INTERSECT'
+        
         if not use_debug_bool:
             if use_interior_hide:
                 cell.data.polygons.foreach_set("hide", [True] * len(cell.data.polygons))
@@ -375,8 +380,7 @@ def cell_boolean(context, original, cells,
             original.select_set(True)
             cell.select_set(True)
             bpy.context.view_layer.objects.active = cell
-            bpy.ops.btool.boolean_inters()
-            bpy.ops.object.modifier_apply(apply_as='DATA', modifier="BTool_" + original.name)
+            bpy.ops.object.modifier_apply(apply_as='DATA', modifier="Boolean")
             
             if i == 0:
                 bpy.data.objects.remove(cell, do_unlink=True)
@@ -445,7 +449,6 @@ def cell_boolean(context, original, cells,
                 _redraw_yasiamevil()
     
     bpy.context.view_layer.objects.active = original
-    bpy.ops.btool.remove(thisObj=original.name, Prop="THIS")
     
     if (not use_debug_bool) and use_island_split:
         # this is ugly and Im not proud of this - campbell
