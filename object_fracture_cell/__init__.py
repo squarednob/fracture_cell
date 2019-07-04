@@ -19,7 +19,7 @@
 bl_info = {
     "name": "Cell Fracture",
     "author": "ideasman42, phymec, Sergey Sharybin, Nobuyuki Hirakata",
-    "version": (1, 0, 1),
+    "version": (1, 0, 2),
     "blender": (2, 80, 0),
     "location": "View3D > Sidebar > Transform tab",
     "description": "Fractured Object, or Cracked Surface",
